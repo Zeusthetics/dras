@@ -457,7 +457,7 @@ textarea{resize:vertical;min-height:72px}
       <div class="card">
         <div class="card-hd">
           <div class="card-title">User Management</div>
-          <button class="btn btn-primary btn-sm" onclick="openUM(null)">+ Add User</button>
+          <button class="btn btn-primary btn-sm" onclick="openUserModal(null)">+ Add User</button>
         </div>
         <div class="tbl-wrap">
           <table>
@@ -602,16 +602,67 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// ── API config — set WORKER_URL after deploying Cloudflare Worker ──
+var WORKER_URL = 'YOUR_CLOUDFLARE_WORKER_URL_HERE';
+// e.g. 'https://dras-proxy.yourname.workers.dev'
+
+// Maps serverFunctionName → { action, payload builder }
+var ACTION_MAP = {
+  serverGetContext:        function(a){ return { action:'getContext',      email:a[0] }; },
+  serverGetAllDrawings:    function(a){ return { action:'getDrawings',     email:a[0] }; },
+  serverGetDrawings:       function(a){ return { action:'getDrawings',     email:a[0] }; },
+  serverGetAuditLog:       function(a){ return { action:'getAuditLog',     drawingId:a[0] }; },
+  serverGetDebugInfo:      function(a){ return { action:'getDebugInfo',    email:a[0] }; },
+  serverInspectSheet:      function(a){ return { action:'getDebugInfo',    email:'' }; },
+  serverSubmitDrawing:     function(a){ return Object.assign({ action:'submitDrawing', email:a[0] }, a[1]); },
+  serverCheckerApprove:    function(a){ return { action:'checkerApprove',  email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverApproverApprove:   function(a){ return { action:'approverApprove', email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverQaRelease:         function(a){ return { action:'qaRelease',       email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverRejectDrawing:     function(a){ return { action:'rejectDrawing',   email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverResubmitDrawing:   function(a){ return { action:'resubmitDrawing', email:a[0], drawingId:a[1], newFileId:a[2], remarks:a[3] }; },
+  serverUploadFile:        function(a){ return { action:'uploadFile',      base64Data:a[0], fileName:a[1], drawingId:a[2] }; },
+  serverUploadStart:       function(a){ return { action:'uploadStart',     fileName:a[0], drawingId:a[1], totalChunks:a[2] }; },
+  serverUploadChunk:       function(a){ return { action:'uploadChunk',     uploadId:a[0], index:a[1], data:a[2] }; },
+  serverUploadFinish:      function(a){ return { action:'uploadFinish',    uploadId:a[0] }; },
+  serverGetUsers:          function(a){ return { action:'getUsers',        email:a[0] }; },
+  serverAddUser:           function(a){ return { action:'addUser',         email:a[0], targetEmail:a[1], name:a[2], role:a[3] }; },
+  serverUpdateUser:        function(a){ return { action:'updateUser',      email:a[0], targetEmail:a[1], name:a[2], role:a[3] }; },
+  serverDeleteUser:        function(a){ return { action:'deleteUser',      email:a[0], targetEmail:a[1] }; },
+  serverGetConfig:         function(a){ return { action:'getConfig',       email:a[0] }; },
+  serverSaveConfig:        function(a){ return { action:'saveConfig',      email:a[0], key:a[1], value:a[2] }; },
+  serverGetReminderConfig: function(a){ return { action:'getReminderConfig', email:a[0] }; },
+  serverSaveReminderConfig:function(a){ return { action:'saveReminderConfig', email:a[0], enabled:a[1], thresholdDays:a[2] }; },
+  serverRunReminderCheck:  function(a){ return { action:'runReminderCheck',email:a[0] }; },
+  // PIN auth
+  serverCheckEmail:        function(a){ return { action:'checkEmail',      targetEmail:a[0] }; },
+  serverVerifyPin:         function(a){ return { action:'verifyPin',       targetEmail:a[0], pin:a[1] }; },
+  serverSetPin:            function(a){ return { action:'setPin',          targetEmail:a[0], pin:a[1] }; },
+  serverValidateToken:     function(a){ return { action:'validateToken',   token:a[0] }; },
+  serverSignOut:           function(a){ return { action:'signOut',         token:a[0] }; },
+  serverAdminResetPin:     function(a){ return { action:'adminResetPin',   email:a[0], targetEmail:a[1] }; },
+  serverChangePin:         function(a){ return { action:'changePin',       targetEmail:a[0], oldPin:a[1], newPin:a[2] }; }
+};
+
 function gs(fn, args) {
   return new Promise(function(res, rej) {
-    if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      rej(new Error('Not served by Apps Script. Open the deployment URL, not the local file.'));
-      return;
-    }
-    var r = google.script.run
-      .withSuccessHandler(res)
-      .withFailureHandler(function(e){ rej(new Error(e.message || String(e))); });
-    r[fn].apply(r, args || []);
+    var mapper = ACTION_MAP[fn];
+    if (!mapper) { rej(new Error('Unknown function: ' + fn)); return; }
+    var payload = mapper(args || []);
+
+    fetch(WORKER_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (r && r.ok) {
+        res(r.data);
+      } else {
+        rej(new Error(r.error || 'Server error'));
+      }
+    })
+    .catch(function(e) { rej(new Error('Network error: ' + e.message)); });
   });
 }
 
@@ -654,22 +705,7 @@ function toast(msg, type) {
 // AUTH
 // ═══════════════════════════════════════════════
 window.addEventListener('load', function() {
-  // Must be served by Apps Script — google.script.run won't exist if opened as a local file
-  if (typeof google === 'undefined' || !google.script) {
-    document.getElementById('ep').style.display = 'none';
-    document.body.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0D0D0D;font-family:IBM Plex Mono,monospace';
-    document.body.innerHTML =
-      '<div style="background:#1a1a1a;border:1px solid #333;border-left:4px solid #D62828;padding:32px 40px;max-width:500px;text-align:center">' +
-      '<div style="font-size:28px;margin-bottom:12px">⚠️</div>' +
-      '<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:10px">Wrong URL</div>' +
-      '<div style="color:#888;font-size:12px;line-height:1.6;margin-bottom:18px">' +
-      'This file cannot be opened directly.<br>' +
-      'You must open the <b style="color:#fff">Apps Script deployment URL</b>.' +
-      '</div>' +
-      '<div style="color:#555;font-size:11px">Go to Apps Script → Deploy → Manage deployments → copy the Web App URL</div>' +
-      '</div>';
-    return;
-  }
+  // HTML now served from GitHub Pages — no Apps Script dependency on page load
   var saved = '';
   try { saved = localStorage.getItem('dras_email') || ''; } catch(e){}
   if (saved) document.getElementById('epEmail').value = saved;
