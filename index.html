@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DRAS — Drawing Release & Approval System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Variables ─────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#D62828;--ink:#0D0D0D;--bg:#F4F1EB;--card:#fff;
+  --border:#E0DDD5;--text:#1A1A1A;--muted:#888;
+  --green:#1B6B3A;--blue:#2B4590;--amber:#B45309;--purple:#6B2D8B;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --sw:220px;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+
+/* ── Layout ────────────────────────────────────────────── */
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sw);background:var(--ink);flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.main{flex:1;min-width:0;overflow-x:hidden}
+
+/* ── Sidebar ───────────────────────────────────────────── */
+.logo{padding:18px 16px 14px;border-bottom:1px solid #1d1d1d}
+.logo-plm{font-family:var(--mono);font-size:9px;background:var(--red);color:#fff;padding:2px 6px;letter-spacing:.1em;display:inline-block;margin-bottom:6px}
+.logo-name{font-size:16px;font-weight:700;color:#fff;letter-spacing:-.01em}
+.logo-sub{font-family:var(--mono);font-size:9px;color:#3a3a3a;margin-top:2px;text-transform:uppercase;letter-spacing:.1em}
+.nav{padding:8px 0;flex:1}
+.nav-sep{padding:8px 16px 3px;font-family:var(--mono);font-size:9px;color:#2a2a2a;text-transform:uppercase;letter-spacing:.12em;margin-top:4px}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#777;cursor:pointer;font-size:13px;transition:all .12s;border-left:3px solid transparent;user-select:none}
+.ni:hover{background:#111;color:#ccc}
+.ni.active{background:#111;color:#fff;border-left-color:var(--red)}
+.ni-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.ni-badge{margin-left:auto;background:var(--red);color:#fff;font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:2px;min-width:20px;text-align:center}
+.user-panel{padding:12px 16px;border-top:1px solid #1a1a1a}
+.user-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.user-av{width:28px;height:28px;background:#1d1d1d;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#888;flex-shrink:0;border:1px solid #2a2a2a}
+.user-nm{color:#ccc;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.user-rl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
+.role-DRAFTER{color:#4A9FD4}.role-CHECKER{color:#F5A623}.role-APPROVER{color:#7ED321}.role-QA{color:#e05050}.role-ADMIN{color:#B07FD4}
+.sw-btn{width:100%;background:transparent;border:1px solid #1d1d1d;color:#444;font-size:10px;font-family:var(--mono);padding:4px 8px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;border-radius:2px;transition:.12s}
+.sw-btn:hover{border-color:#333;color:#666}
+
+/* ── Topbar ────────────────────────────────────────────── */
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.page-title{font-size:14px;font-weight:700}
+.topbar-r{display:flex;gap:8px;align-items:center}
+#topEmail{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+/* ── Views ─────────────────────────────────────────────── */
+.view{display:none;padding:20px 24px}.view.active{display:block}
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:var(--sans);transition:all .12s;border-radius:2px;white-space:nowrap;line-height:1.2}
+.btn-primary{background:var(--red);color:#fff}.btn-primary:hover{background:#B01F1F}
+.btn-success{background:var(--green);color:#fff}.btn-success:hover{background:#155730}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-outline:hover{border-color:#999;background:#fafaf8}
+.btn-danger{background:#FFF0F0;color:var(--red);border:1px solid #FFD0D0}.btn-danger:hover{background:#FFE0E0}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-xs{padding:3px 8px;font-size:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ── Cards ─────────────────────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--border);margin-bottom:16px;border-radius:2px}
+.card-hd{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px}
+.card-title{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#555}
+.card-body{padding:18px}
+
+/* ── Stats ─────────────────────────────────────────────── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:18px}
+.stat-card{background:#fff;border:1px solid var(--border);padding:14px 16px;border-radius:2px}
+.stat-num{font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:5px}
+.stat-card.red .stat-num{color:var(--red)}.stat-card.green .stat-num{color:var(--green)}
+.stat-card.blue .stat-num{color:var(--blue)}.stat-card.amber .stat-num{color:var(--amber)}
+
+/* ── Tables ────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#F8F7F4;color:#555;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;text-align:left;white-space:nowrap;border-bottom:2px solid var(--border)}
+td{padding:8px 12px;border-bottom:1px solid #F0EDE6;vertical-align:middle}
+tr:hover td{background:#FAFAF8}
+tr:last-child td{border-bottom:none}
+.no-data{text-align:center;color:var(--muted);padding:28px!important;font-size:12px}
+.tbl-id{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--ink)}
+
+/* ── Badges ────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;text-transform:uppercase;letter-spacing:.05em;border-radius:2px;white-space:nowrap}
+.badge-DRAFT{background:#F0EDE6;color:#666}
+.badge-CHECKING{background:#FFF3CD;color:#7A4A00}
+.badge-APPROVAL{background:#E8F0FF;color:var(--blue)}
+.badge-QA{background:#FFE8E8;color:var(--red)}
+.badge-RELEASED{background:#E8F8EE;color:var(--green)}
+.badge-REJECTED{background:#F8E8E8;color:#900}
+.role-badge{font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;border-radius:2px;text-transform:uppercase;letter-spacing:.04em}
+.rb-DRAFTER{background:#E8F4FF;color:#2B6CB0}
+.rb-CHECKER{background:#FFFCE8;color:#7A5200}
+.rb-APPROVER{background:#EFF8E8;color:#2D6016}
+.rb-QA{background:#FFE8E8;color:var(--red)}
+.rb-ADMIN{background:#F3E8FF;color:var(--purple)}
+
+/* ── Forms ─────────────────────────────────────────────── */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.form-row.full{grid-template-columns:1fr}
+.fg{display:flex;flex-direction:column;gap:5px}
+label,.lbl{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#666}
+input,select,textarea{border:1px solid var(--border);padding:8px 10px;font-size:13px;font-family:var(--sans);background:#fff;width:100%;border-radius:2px;transition:border .12s;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
+textarea{resize:vertical;min-height:72px}
+.hint{font-size:10px;color:var(--muted);margin-top:3px}
+.req{color:var(--red)}
+
+/* ── Upload ────────────────────────────────────────────── */
+.upload-zone{border:2px dashed var(--border);padding:22px;text-align:center;cursor:pointer;transition:all .15s;border-radius:3px;background:#FAFAF8}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--red);background:#FFF8F8}
+.upload-icon{font-size:26px;margin-bottom:6px}
+.upload-text{font-size:12px;color:var(--muted)}.upload-text b{color:var(--red)}
+.file-chosen{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#F0F8FF;border:1px solid #C0D8F0;margin-top:8px;font-size:11px;border-radius:2px}
+.progress-wrap{display:none;margin-top:8px}
+.progress-bar-bg{background:#eee;height:5px;border-radius:3px;overflow:hidden}
+.progress-bar{height:5px;background:var(--green);border-radius:3px;transition:width .2s;width:0%}
+.progress-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px}
+
+/* ── Alerts ────────────────────────────────────────────── */
+.alert{padding:9px 13px;font-size:12px;margin-bottom:12px;border-radius:2px;display:none}
+.alert.show{display:block}
+.ae{background:#FFF0F0;color:var(--red);border-left:3px solid var(--red)}
+.as{background:#EFF8F3;color:var(--green);border-left:3px solid var(--green)}
+.ai{background:#EEF2FF;color:var(--blue);border-left:3px solid var(--blue)}
+
+/* ── Toast ─────────────────────────────────────────────── */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:10px 16px;font-size:12px;z-index:9999;border-radius:2px;max-width:300px;pointer-events:none;opacity:0;transform:translateY(8px);transition:all .2s}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ts{border-left:3px solid var(--green)}.toast.te{border-left:3px solid var(--red)}.toast.ti{border-left:3px solid var(--blue)}
+
+/* ── Spinner ───────────────────────────────────────────── */
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:_spin .6s linear infinite;vertical-align:middle}
+@keyframes _spin{to{transform:rotate(360deg)}}
+
+/* ── Loading Overlay ───────────────────────────────────── */
+.loading-ov{display:none;position:fixed;inset:0;background:rgba(244,241,235,.88);z-index:2000;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.loading-ov.show{display:flex}
+.loading-txt{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ── Modal ─────────────────────────────────────────────── */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:16px}
+.modal-ov.open{display:flex}
+.modal{background:#fff;width:660px;max-width:100%;max-height:90vh;overflow:hidden;border-radius:2px;box-shadow:0 24px 80px rgba(0,0,0,.25);display:flex;flex-direction:column}
+.modal-sm{width:420px}
+.modal-hd{padding:13px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.modal-title{font-size:12px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em}
+.modal-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);line-height:1;padding:2px 6px}
+.modal-x:hover{color:var(--text)}
+.modal-body{padding:18px;overflow-y:auto;flex:1}
+.modal-ft{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+/* ── Pipeline ──────────────────────────────────────────── */
+.pipeline{display:flex;overflow-x:auto;padding:2px 0;margin-bottom:14px;gap:0}
+.ps{flex:1;min-width:72px;text-align:center;padding:8px 4px;background:#F5F5F0;border:1px solid var(--border);position:relative;margin-right:14px;font-size:10px;transition:.12s}
+.ps:last-child{margin-right:0}
+.ps.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.ps.done{background:#E8F8EE;border-color:#9DCCB0;color:var(--green)}
+.ps::after{content:'→';position:absolute;right:-12px;top:50%;transform:translateY(-50%);font-size:11px;color:#bbb;z-index:1;background:transparent;width:12px;text-align:center}
+.ps:last-child::after{display:none}
+.ps-n{font-family:var(--mono);font-size:8px;opacity:.5;margin-bottom:2px}
+.ps-l{font-weight:700;font-size:10px}
+
+/* ── Timeline ──────────────────────────────────────────── */
+.timeline{padding:2px 0}
+.tl-item{display:flex;gap:10px;padding-bottom:14px;position:relative}
+.tl-item::before{content:'';position:absolute;left:13px;top:26px;bottom:0;width:2px;background:var(--border)}
+.tl-item:last-child::before{display:none}
+.tl-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;z-index:1}
+.dot-ok{background:#E8F8EE;border:2px solid var(--green)}
+.dot-no{background:#FFF0F0;border:2px solid var(--red)}
+.dot-pend{background:#F5F5F5;border:2px dashed #CCC}
+.tl-body{flex:1;padding-top:3px}
+.tl-act{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase}
+.tl-meta{font-size:10px;color:var(--muted);margin-top:1px}
+.tl-rem{font-size:11px;color:#555;margin-top:4px;padding:5px 9px;background:#FFF8F0;border-left:2px solid var(--amber);border-radius:1px}
+
+/* ── Info Grid ─────────────────────────────────────────── */
+.info-grid{display:grid;grid-template-columns:110px 1fr 110px 1fr;font-size:12px;border:1px solid var(--border);border-radius:2px;overflow:hidden;margin-bottom:14px}
+.ig-lbl{background:#F8F7F4;color:var(--muted);padding:6px 10px;font-size:10px;font-weight:600;font-family:var(--mono);border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.ig-val{padding:6px 10px;border-bottom:1px solid var(--border);word-break:break-word}
+.ig-lbl:nth-last-child(-n+2),.ig-val:nth-last-child(-n+2){border-bottom:none}
+.ig-full{grid-column:2/5}
+.ig-lbl-wide{grid-column:1/2}.ig-full-row{display:contents}
+
+/* ── Filter Bar ────────────────────────────────────────── */
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-bar input{max-width:220px}
+.filter-bar select{max-width:160px}
+
+/* ── Empty State ───────────────────────────────────────── */
+.empty-st{text-align:center;padding:40px 20px;background:#FAFAF8;border:1px solid var(--border);border-radius:2px}
+.es-icon{font-size:36px;margin-bottom:10px}
+.es-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.es-sub{font-size:12px;color:var(--muted)}
+
+/* ── Email Prompt ──────────────────────────────────────── */
+#ep{display:none;position:fixed;inset:0;background:rgba(13,13,13,.92);z-index:3000;align-items:center;justify-content:center}
+.ep-card{background:var(--bg);width:390px;max-width:94vw;border-radius:2px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.ep-head{background:var(--ink);padding:20px 24px;border-left:4px solid var(--red)}
+.ep-body{padding:22px 24px}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media(max-width:680px){
+  :root{--sw:46px}
+  .logo-name,.logo-sub,.logo-plm,.ni span,.user-nm,.user-rl,.sw-btn,.nav-sep{display:none}
+  .ni{padding:11px;justify-content:center}
+  .form-row{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .info-grid{grid-template-columns:90px 1fr}
+  .ig-full{grid-column:2/3}
+}
+</style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loadingOv" class="loading-ov">
+  <div style="font-size:28px">📐</div>
+  <div class="loading-txt" id="loadingTxt">Loading…</div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- Email Prompt -->
+<div id="ep">
+  <div class="ep-card">
+    <div class="ep-head">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <span style="font-size:18px;font-weight:700;color:#fff">DRAS</span>
+        <span style="font-family:var(--mono);font-size:9px;background:var(--red);color:#fff;padding:2px 6px;letter-spacing:.1em">PLM</span>
+      </div>
+      <div style="color:#888;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em">Drawing Release &amp; Approval System</div>
+      <div style="color:#3a3a3a;font-size:10px;margin-top:1px">Safex Fire Services Ltd.</div>
+    </div>
+    <div class="ep-body">
+      <p style="font-size:12px;color:#666;margin-bottom:16px">Enter your registered email to sign in and access your drawings.</p>
+      <div class="fg" style="margin-bottom:6px">
+        <label>Your Email</label>
+        <input id="epEmail" type="email" placeholder="you@safexfire.com" onkeydown="if(event.key==='Enter')signIn()">
+      </div>
+      <div id="epErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+      <button onclick="signIn()" id="signInBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Continue →</button>
+      <p style="font-size:10px;color:#999;margin-top:10px;text-align:center">Email is used only to load your role and drawings.</p>
+    </div>
+  </div>
+</div>
+
+<!-- App Shell -->
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-plm">PLM</div>
+      <div class="logo-name">DRAS</div>
+      <div class="logo-sub">Drawing Release System</div>
+    </div>
+    <nav class="nav">
+      <div class="ni active" onclick="showView('dashboard')" id="nav-dashboard">
+        <span class="ni-icon">📊</span><span>Dashboard</span>
+      </div>
+      <div class="ni" onclick="showView('queue')" id="nav-queue">
+        <span class="ni-icon">⏳</span><span>Work Queue</span>
+        <span class="ni-badge" id="qBadge" style="display:none">0</span>
+      </div>
+      <div class="ni" onclick="showView('drawings')" id="nav-drawings">
+        <span class="ni-icon">📋</span><span>Drawings</span>
+      </div>
+      <div class="ni" onclick="showView('submit')" id="nav-submit">
+        <span class="ni-icon">➕</span><span>Submit Drawing</span>
+      </div>
+      <div class="nav-sep" id="nav-admin-sep" style="display:none">Admin</div>
+      <div class="ni" onclick="showView('users')" id="nav-users" style="display:none">
+        <span class="ni-icon">👥</span><span>Users</span>
+      </div>
+      <div class="ni" onclick="showView('settings')" id="nav-settings" style="display:none">
+        <span class="ni-icon">⚙️</span><span>Settings</span>
+      </div>
+    </nav>
+    <div class="user-panel">
+      <div class="user-row">
+        <div class="user-av" id="uAv">?</div>
+        <div style="min-width:0">
+          <div class="user-nm" id="uName">—</div>
+          <div class="user-rl" id="uRole">—</div>
+        </div>
+      </div>
+      <button onclick="switchAccount()" class="sw-btn">⇄ Switch Account</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="pageTitle">Dashboard</div>
+      <div class="topbar-r">
+        <span id="topEmail"></span>
+        <button class="btn btn-outline btn-sm" onclick="loadDrawings()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard" class="view active">
+      <div class="stats-row" id="dashStats">
+        <div class="stat-card amber"><div class="stat-num">—</div><div class="stat-lbl">Loading…</div></div>
+      </div>
+      <div id="dashChart" class="card" style="display:none">
+        <div class="card-hd"><div class="card-title">Pipeline Distribution</div></div>
+        <div class="card-body" style="max-height:250px"><canvas id="chartCanvas"></canvas></div>
+      </div>
+      <div id="dashRecent" style="display:none">
+        <div class="card">
+          <div class="card-hd">
+            <div class="card-title">Recent Drawings</div>
+            <button class="btn btn-outline btn-sm" onclick="showView('drawings')">View All →</button>
+          </div>
+          <div class="tbl-wrap" id="dashRecentBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORK QUEUE -->
+    <div id="view-queue" class="view">
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">Pending Actions</div>
+          <span id="qSubtitle" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Drawing No.</th><th>Title</th><th>Rev</th>
+              <th>Stage</th><th>Project</th><th>Client</th><th>Submitted</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="qBody"><tr><td colspan="8" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRAWINGS REGISTER -->
+    <div id="view-drawings" class="view">
+      <div class="filter-bar">
+        <input type="text" id="dFilter" placeholder="Search by number, title, project…" oninput="applyFilters()">
+        <select id="dStage" onchange="applyFilters()">
+          <option value="">All Stages</option>
+          <option>DRAFT</option><option>CHECKING</option><option>APPROVAL</option>
+          <option>QA</option><option>RELEASED</option>
+        </select>
+        <select id="dCat" onchange="applyFilters()">
+          <option value="">All Categories</option>
+          <option>Mechanical</option><option>Electrical</option><option>P&amp;ID</option>
+          <option>Layout</option><option>Civil</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">Drawing Register</div>
+          <span id="dCount" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Drawing No.</th><th>Title</th><th>Rev</th><th>Category</th>
+              <th>Stage</th><th>Project</th><th>Client</th><th>Submitted</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="dBody"><tr><td colspan="9" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBMIT DRAWING -->
+    <div id="view-submit" class="view">
+      <div class="card" style="max-width:720px">
+        <div class="card-hd"><div class="card-title">Submit New Drawing for Review</div></div>
+        <div class="card-body">
+          <div id="submitAlert" class="alert"></div>
+          <div class="form-row">
+            <div class="fg">
+              <label>Drawing Title <span class="req">*</span></label>
+              <input type="text" id="f-title" placeholder="e.g. Fire Suppression Header Assembly">
+            </div>
+            <div class="fg">
+              <label>Category</label>
+              <select id="f-cat">
+                <option>Mechanical</option><option>Electrical</option>
+                <option>P&amp;ID</option><option>Layout</option><option>Civil</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="fg">
+              <label>Project</label>
+              <input type="text" id="f-proj" placeholder="e.g. FM Pune Plant 3">
+            </div>
+            <div class="fg">
+              <label>Client</label>
+              <input type="text" id="f-client" placeholder="e.g. Force Motors">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="fg">
+              <label>Assign Checker <span class="req">*</span></label>
+              <select id="f-checker"><option value="">— Select Checker —</option></select>
+            </div>
+            <div class="fg">
+              <label>Assign Approver <span class="req">*</span></label>
+              <select id="f-approver"><option value="">— Select Approver —</option></select>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>Drawing File (PDF) <span class="req">*</span></label>
+              <div class="upload-zone" id="uploadZone"
+                onclick="document.getElementById('fileInput').click()"
+                ondragover="event.preventDefault();this.classList.add('drag')"
+                ondragleave="this.classList.remove('drag')"
+                ondrop="handleDrop(event)">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Click to browse or <b>drag & drop</b> PDF here</div>
+                <div id="fileChosen" class="file-chosen" style="display:none">
+                  <span>📎</span><span id="fileChosenName"></span>
+                </div>
+              </div>
+              <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleFileSelect(this)">
+              <div class="progress-wrap" id="submitProgress">
+                <div class="progress-bar-bg"><div class="progress-bar" id="submitPBar"></div></div>
+                <div class="progress-lbl" id="submitPLbl">Uploading…</div>
+              </div>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>Remarks for Checker (optional)</label>
+              <textarea id="f-remarks" placeholder="Any notes or context for the checker…"></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="submitDrawing()" id="submitBtn" style="font-size:13px;padding:9px 20px">
+            Submit Drawing →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN: USERS -->
+    <div id="view-users" class="view" style="display:none">
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">User Management</div>
+          <button class="btn btn-primary btn-sm" onclick="openUM(null)">+ Add User</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Actions</th></tr></thead>
+            <tbody id="usersBody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN: SETTINGS -->
+    <div id="view-settings" class="view" style="display:none">
+      <div class="card" style="max-width:500px">
+        <div class="card-hd"><div class="card-title">System Settings</div></div>
+        <div class="card-body">
+          <div id="settingsAlert" class="alert"></div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>Company Name</label>
+              <input type="text" id="cfg-company" placeholder="Safex Fire Services Ltd.">
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>QA Email</label>
+              <input type="email" id="cfg-qa" placeholder="qa@safexfire.com">
+              <div class="hint">Receives all QA stage notifications.</div>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>Drawing Number Prefix</label>
+              <input type="text" id="cfg-prefix" placeholder="WM" maxlength="8">
+              <div class="hint">Format: PREFIX-YEAR-NNN &nbsp;(e.g. WM → WM-2026-001)</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()" id="saveSettingsBtn">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- DRAWING MODAL -->
+<div class="modal-ov" id="drawingModal">
+  <div class="modal" style="width:700px">
+    <div class="modal-hd">
+      <div class="modal-title" id="dmTitle">Drawing</div>
+      <button class="modal-x" onclick="closeDM()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="dmAlert" class="alert"></div>
+      <div id="dmPipeline" class="pipeline"></div>
+      <div id="dmInfo" class="info-grid"></div>
+      <div id="dmPdf" style="display:none;margin-bottom:14px">
+        <div class="lbl" style="margin-bottom:6px">Drawing File</div>
+        <iframe id="pdfFrame" style="width:100%;height:360px;border:1px solid var(--border);border-radius:2px"></iframe>
+      </div>
+      <div id="dmAudit" style="display:none;margin-bottom:14px">
+        <div class="lbl" style="margin-bottom:8px">Approval History</div>
+        <div class="timeline" id="dmAuditTl"></div>
+      </div>
+      <div id="dmAction" style="display:none">
+        <div class="lbl" style="margin-bottom:8px">Your Action</div>
+        <div class="fg" style="margin-bottom:10px">
+          <label>Remarks <span id="dmRemReq" class="req" style="display:none">*</span></label>
+          <textarea id="dmRemarks" rows="3" placeholder="Add remarks…"></textarea>
+          <div class="hint" id="dmRemHint"></div>
+        </div>
+        <div id="dmResubFile" style="display:none">
+          <div class="fg" style="margin-bottom:8px">
+            <label>Upload Revised PDF (optional)</label>
+            <input type="file" id="resubFile" accept=".pdf">
+          </div>
+          <div class="progress-wrap" id="resubProgress">
+            <div class="progress-bar-bg"><div class="progress-bar" id="resubPBar"></div></div>
+            <div class="progress-lbl" id="resubPLbl">Uploading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft" id="dmFooter">
+      <button class="btn btn-outline" onclick="closeDM()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL (admin) -->
+<div class="modal-ov" id="userModal">
+  <div class="modal modal-sm">
+    <div class="modal-hd">
+      <div class="modal-title" id="umTitle">Add User</div>
+      <button class="modal-x" onclick="closeUM()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="umAlert" class="alert"></div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Email <span class="req">*</span></label>
+          <input type="email" id="umEmail" placeholder="user@safexfire.com">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Full Name <span class="req">*</span></label>
+          <input type="text" id="umName" placeholder="e.g. Arjun Sharma">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Role <span class="req">*</span></label>
+          <select id="umRole">
+            <option value="DRAFTER">DRAFTER — Submit drawings</option>
+            <option value="CHECKER">CHECKER — Check drawings</option>
+            <option value="APPROVER">APPROVER — Approve drawings</option>
+            <option value="QA">QA — Release drawings</option>
+            <option value="ADMIN">ADMIN — Full access</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeUM()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()" id="saveUserBtn">Save User</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+var CTX = {}, allDrawings = [], selFile = null, editEmail = null, chartInst = null;
+var _curDid = null, _curMode = null;
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function gs(fn, args) {
+  return new Promise(function(res, rej) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      rej(new Error('Not served by Apps Script. Open the deployment URL, not the local file.'));
+      return;
+    }
+    var r = google.script.run
+      .withSuccessHandler(res)
+      .withFailureHandler(function(e){ rej(new Error(e.message || String(e))); });
+    r[fn].apply(r, args || []);
+  });
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+  catch(e){ return String(d); }
+}
+
+function sbadge(s) {
+  return '<span class="badge badge-'+esc(s)+'">'+esc(s)+'</span>';
+}
+
+function rbadge(r) {
+  return '<span class="role-badge rb-'+esc(r)+'">'+esc(r)+'</span>';
+}
+
+function showLoad(on, txt) {
+  document.getElementById('loadingOv').classList.toggle('show', !!on);
+  if (txt) document.getElementById('loadingTxt').textContent = txt;
+}
+
+function salert(el, msg, type) {
+  el.textContent = msg;
+  el.className = 'alert show a' + type[0];
+}
+
+function halert(el) { el.className = 'alert'; }
+
+var _tt = null;
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show t' + (type || 's')[0];
+  if (_tt) clearTimeout(_tt);
+  _tt = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+window.addEventListener('load', function() {
+  // Must be served by Apps Script — google.script.run won't exist if opened as a local file
+  if (typeof google === 'undefined' || !google.script) {
+    document.getElementById('ep').style.display = 'none';
+    document.body.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0D0D0D;font-family:IBM Plex Mono,monospace';
+    document.body.innerHTML =
+      '<div style="background:#1a1a1a;border:1px solid #333;border-left:4px solid #D62828;padding:32px 40px;max-width:500px;text-align:center">' +
+      '<div style="font-size:28px;margin-bottom:12px">⚠️</div>' +
+      '<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:10px">Wrong URL</div>' +
+      '<div style="color:#888;font-size:12px;line-height:1.6;margin-bottom:18px">' +
+      'This file cannot be opened directly.<br>' +
+      'You must open the <b style="color:#fff">Apps Script deployment URL</b>.' +
+      '</div>' +
+      '<div style="color:#555;font-size:11px">Go to Apps Script → Deploy → Manage deployments → copy the Web App URL</div>' +
+      '</div>';
+    return;
+  }
+  var saved = '';
+  try { saved = localStorage.getItem('dras_email') || ''; } catch(e){}
+  if (saved) document.getElementById('epEmail').value = saved;
+  document.getElementById('ep').style.display = 'flex';
+});
+
+function signIn() {
+  var email = (document.getElementById('epEmail').value || '').trim();
+  var err   = document.getElementById('epErr');
+  if (!email || !email.includes('@')) { err.textContent = 'Enter a valid email.'; return; }
+  err.textContent = '';
+  try { localStorage.setItem('dras_email', email.toLowerCase()); } catch(e){}
+  var btn = document.getElementById('signInBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Signing in…';
+
+  gs('serverGetContext', [email])
+    .then(function(ctx) {
+      try {
+        CTX = ctx;
+        applyCtx();
+        document.getElementById('ep').style.display = 'none';
+        loadDrawings();
+      } catch(e) {
+        btn.disabled = false; btn.innerHTML = 'Continue →';
+        err.textContent = 'Error: ' + e.message;
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.innerHTML = 'Continue →';
+      err.textContent = 'Failed: ' + e.message;
+    });
+}
+
+function applyCtx() {
+  var u = CTX.user;
+  document.getElementById('uName').textContent = u.name;
+  document.getElementById('uRole').textContent = u.role;
+  document.getElementById('uRole').className = 'user-rl role-' + u.role;
+  document.getElementById('uAv').textContent  = (u.name || '?')[0].toUpperCase();
+  document.getElementById('topEmail').textContent = u.email;
+
+  // populate checker/approver dropdowns
+  var chk = document.getElementById('f-checker');
+  var apr = document.getElementById('f-approver');
+  while (chk.options.length > 1) chk.remove(1);
+  while (apr.options.length > 1) apr.remove(1);
+  (CTX.checkers  || []).forEach(function(x){ var o=new Option(x.name+' <'+x.email+'>',x.email); chk.add(o); });
+  (CTX.approvers || []).forEach(function(x){ var o=new Option(x.name+' <'+x.email+'>',x.email); apr.add(o); });
+
+  var role    = u.role;
+  var isAdmin = role === 'ADMIN';
+  var isDraft = role === 'DRAFTER' || isAdmin;
+  document.getElementById('nav-submit').style.display      = isDraft ? '' : 'none';
+  document.getElementById('nav-admin-sep').style.display   = isAdmin ? '' : 'none';
+  document.getElementById('nav-users').style.display       = isAdmin ? '' : 'none';
+  document.getElementById('nav-settings').style.display    = isAdmin ? '' : 'none';
+}
+
+function switchAccount() {
+  try { localStorage.removeItem('dras_email'); } catch(e){}
+  CTX = {}; allDrawings = [];
+  document.getElementById('epEmail').value = '';
+  document.getElementById('epErr').textContent = '';
+  var btn = document.getElementById('signInBtn');
+  btn.disabled = false; btn.innerHTML = 'Continue →';
+  document.getElementById('ep').style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+var TITLES = {
+  dashboard:'Dashboard', queue:'Work Queue', drawings:'Drawing Register',
+  submit:'Submit Drawing', users:'User Management', settings:'Settings'
+};
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); v.style.display = ''; });
+  document.querySelectorAll('.ni').forEach(function(n){ n.classList.remove('active'); });
+  var v = document.getElementById('view-'+name);
+  if (v) { v.style.display = ''; v.classList.add('active'); }
+  var n = document.getElementById('nav-'+name);
+  if (n) n.classList.add('active');
+  document.getElementById('pageTitle').textContent = TITLES[name] || name;
+  if (name === 'users')    loadUsers();
+  if (name === 'settings') loadSettings();
+}
+
+// ═══════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════
+function loadDrawings() {
+  showLoad(true, 'Loading drawings…');
+  var role = CTX.user && CTX.user.role;
+  var fn   = (['ADMIN','QA'].indexOf(role) >= 0) ? 'serverGetAllDrawings' : 'serverGetDrawings';
+  gs(fn, [CTX.user.email])
+    .then(function(data) {
+      allDrawings = (data || []).map(function(d) {
+        // Normalise CurrentStage to uppercase to handle sheet inconsistencies
+        if (d.CurrentStage) d.CurrentStage = String(d.CurrentStage).trim().toUpperCase();
+        return d;
+      });
+      document.getElementById('topEmail').textContent =
+        (CTX.user && CTX.user.email || '') + '  ·  ' + allDrawings.length + ' drawing(s)  ·  ' + role;
+      renderDashboard();
+      renderQueue();
+      renderDrawings();
+      showLoad(false);
+    })
+    .catch(function(e) {
+      showLoad(false);
+      // Show error prominently in dashboard, not just a dismissable toast
+      document.getElementById('dashStats').innerHTML =
+        '<div style="grid-column:1/-1;padding:20px;background:#FFF0F0;border:1px solid #FFD0D0;color:var(--red);font-size:13px">' +
+        '<b>Failed to load drawings:</b> ' + esc(e.message) +
+        '<br><span style="font-size:11px;color:#888;margin-top:6px;display:block">Role: ' + esc(role) + '  ·  Email: ' + esc(CTX.user && CTX.user.email) + '</span>' +
+        '<button onclick="loadDrawings()" class="btn btn-outline btn-sm" style="margin-top:10px">↻ Retry</button>' +
+        '</div>';
+      document.getElementById('dashChart').style.display = 'none';
+      document.getElementById('dashRecent').style.display = 'none';
+    });
+}
+
+function loadUsers() {
+  gs('serverGetUsers', [CTX.user && CTX.user.email])
+    .then(renderUsers)
+    .catch(function(e) {
+      document.getElementById('usersBody').innerHTML =
+        '<tr><td colspan="4" class="no-data" style="color:var(--red)">'+esc(e.message)+'</td></tr>';
+    });
+}
+
+function loadSettings() {
+  gs('serverGetConfig', [CTX.user && CTX.user.email])
+    .then(function(cfg) {
+      document.getElementById('cfg-company').value = cfg.COMPANY_NAME    || '';
+      document.getElementById('cfg-qa').value      = cfg.QA_EMAIL        || '';
+      document.getElementById('cfg-prefix').value  = cfg.DRAWING_PREFIX  || 'WM';
+    })
+    .catch(function(){});
+}
+
+// ═══════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════
+function renderDashboard() {
+  var role  = CTX.user && CTX.user.role;
+  var email = (CTX.user && CTX.user.email) || '';
+  var bs = { DRAFT:0, CHECKING:0, APPROVAL:0, QA:0, RELEASED:0 };
+  allDrawings.forEach(function(d){ if (bs[d.CurrentStage] !== undefined) bs[d.CurrentStage]++; });
+  var total = allDrawings.length;
+
+  if (total === 0 && ['ADMIN','QA'].indexOf(role) < 0) {
+    document.getElementById('dashStats').innerHTML =
+      '<div style="grid-column:1/-1"><div class="empty-st">'+
+      '<div class="es-icon">🔍</div>'+
+      '<div class="es-title">No drawings visible to <span style="font-family:var(--mono);color:var(--red)">'+esc(email)+'</span></div>'+
+      '<div class="es-sub" style="max-width:460px;margin:0 auto">'+
+        'Your account (role: <b>'+esc(role)+'</b>) has no drawings assigned yet.<br>'+
+        'If drawings exist in the sheet, your email may not match. Check below.'+
+      '</div>'+
+      (role==='DRAFTER' ? '<button onclick="showView(\'submit\')" class="btn btn-primary" style="margin-top:14px">Submit New Drawing →</button>' : '')+
+      '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'+
+        '<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Account Diagnostic</div>'+
+        '<pre id="dbgOut" style="background:#1A1A1A;color:#7EC8C8;font-size:10px;padding:12px;text-align:left;white-space:pre-wrap;border-radius:2px;min-height:60px">Loading diagnostic…</pre>'+
+      '</div>'+
+      '</div></div>';
+    document.getElementById('dashChart').style.display = 'none';
+    document.getElementById('dashRecent').style.display = 'none';
+    // Auto-run diagnostic so user immediately sees the email mismatch
+    gs('serverGetDebugInfo', [email])
+      .then(function(info) {
+        var out = document.getElementById('dbgOut');
+        if (!out) return;
+        out.textContent =
+          'Your email : ' + info.resolvedEmail +
+          '\nYour role  : ' + info.resolvedRole +
+          '\nTotal drawings in sheet  : ' + info.totalDrawings +
+          '\nVisible to your account  : ' + info.visibleDrawings +
+          '\n\nSubmittedBy values in sheet (sign in as one of these to see drawings):\n  ' +
+          (info.submittedByValues.join('\n  ') || '(none — sheet may be empty)') +
+          '\n\nAssigned Checkers in sheet:\n  ' + (info.checkerValues.join('\n  ')  || '(none)') +
+          '\n\nAll registered users:\n  '       + (info.usersInSheet.join('\n  ')   || '(none)');
+      })
+      .catch(function(e) {
+        var out = document.getElementById('dbgOut');
+        if (out) out.textContent = 'Diagnostic error: ' + e.message;
+      });
+    return;
+  }
+
+  // ADMIN/QA with zero drawings — run sheet inspector to find out why
+  if (total === 0 && ['ADMIN','QA'].indexOf(role) >= 0) {
+    document.getElementById('dashStats').innerHTML =
+      '<div style="grid-column:1/-1;padding:18px 20px;background:#FFF3CD;border:1px solid #FFE083;font-size:13px">' +
+      '<b>⚠ No drawings found</b> — ' + esc(role) + ' should see all drawings. Running sheet diagnostic…<br>' +
+      '<pre id="inspOut" style="margin-top:10px;background:#1A1A1A;color:#7EC8C8;font-size:10px;padding:12px;white-space:pre-wrap;border-radius:2px;min-height:80px">Inspecting sheet…</pre>' +
+      '</div>';
+    document.getElementById('dashChart').style.display = 'none';
+    document.getElementById('dashRecent').style.display = 'none';
+    // Call the raw sheet inspector — no role check, always works
+    gs('serverInspectSheet', [])
+      .then(function(info) {
+        var out = document.getElementById('inspOut');
+        if (!out) return;
+        if (info.error) { out.textContent = 'Sheet error: ' + info.error; return; }
+        out.textContent =
+          'Sheet: "' + info.sheetName + '"  |  Total rows (incl. header): ' + info.totalRows +
+          '  |  Non-empty data rows: ' + info.nonEmptyRows +
+          '\n\nHeader row:\n  ' + (info.headerRow || []).join(' | ') +
+          '\n\nFirst 5 data rows (cols 1–8):\n' +
+          (info.sampleRows && info.sampleRows.length
+            ? info.sampleRows.map(function(r,i){ return '  ['+(i+1)+']: '+JSON.stringify(r); }).join('\n')
+            : '  (no data rows)') +
+          '\n\n── Debug info ──' ;
+        // Chain with getDebugInfo to see user resolution
+        return gs('serverGetDebugInfo', [email]);
+      })
+      .then(function(dbg) {
+        if (!dbg) return;
+        var out = document.getElementById('inspOut');
+        if (!out) return;
+        out.textContent += '\nResolved email: ' + dbg.resolvedEmail +
+          '  |  role: ' + dbg.resolvedRole +
+          '\nTotal drawings returned by SheetDAO: ' + dbg.totalDrawings +
+          '\nSubmittedBy values: ' + (dbg.submittedByValues.join(', ') || '(none)') +
+          '\nUsers in sheet: ' + (dbg.usersInSheet.join(', ') || '(none)');
+      })
+      .catch(function(e) {
+        var out = document.getElementById('inspOut');
+        if (out) out.textContent = 'Inspect error: ' + e.message;
+      });
+    return;
+  }
+
+  // Warn if total > 0 but all stage buckets are 0 (CurrentStage values don't match expected)
+  var stageTotal = bs.DRAFT + bs.CHECKING + bs.APPROVAL + bs.QA + bs.RELEASED;
+  if (total > 0 && stageTotal === 0) {
+    // Collect the actual unique stage values from the sheet for diagnostics
+    var actualStages = {};
+    allDrawings.forEach(function(d){ actualStages[d.CurrentStage || '(blank)'] = true; });
+    document.getElementById('dashStats').innerHTML =
+      '<div style="grid-column:1/-1;padding:14px 16px;background:#FFF3CD;border:1px solid #FFE083;font-size:12px">' +
+      '<b>⚠ ' + total + ' drawings loaded, but stage values don\'t match expected format.</b><br>' +
+      'Expected: DRAFT, CHECKING, APPROVAL, QA, RELEASED<br>' +
+      'Found in sheet: <b>' + Object.keys(actualStages).join(', ') + '</b>' +
+      '</div>';
+    document.getElementById('dashChart').style.display = 'none';
+    document.getElementById('dashRecent').style.display = 'none';
+    return;
+  }
+
+  // Build stats HTML
+  var statsHtml = '';
+  if (['ADMIN','QA'].indexOf(role) >= 0) {
+    statsHtml =
+      mstat(total, 'Total', '') +
+      mstat(bs.DRAFT,    'Draft / Returned', 'amber') +
+      mstat(bs.CHECKING, 'In Checking', 'blue') +
+      mstat(bs.APPROVAL, 'In Approval', 'blue') +
+      mstat(bs.QA,       'Awaiting QA',  'red') +
+      mstat(bs.RELEASED, 'Released',     'green');
+  } else if (role === 'DRAFTER') {
+    var mine = allDrawings.filter(function(d){ return (d.SubmittedBy||'').toLowerCase() === email; });
+    var ms = {DRAFT:0,CHECKING:0,APPROVAL:0,QA:0,RELEASED:0};
+    mine.forEach(function(d){ if(ms[d.CurrentStage]!==undefined) ms[d.CurrentStage]++; });
+    statsHtml =
+      mstat(mine.length, 'My Submissions', '') +
+      mstat(ms.DRAFT, 'Needs Resubmit', 'amber') +
+      mstat(ms.CHECKING + ms.APPROVAL + ms.QA, 'In Review', 'blue') +
+      mstat(ms.RELEASED, 'Released', 'green');
+  } else if (role === 'CHECKER') {
+    var asgn  = allDrawings.filter(function(d){ return (d.AssignedChecker||'').toLowerCase() === email; });
+    var pend  = asgn.filter(function(d){ return d.CurrentStage === 'CHECKING'; });
+    var done  = asgn.filter(function(d){ return ['APPROVAL','QA','RELEASED'].indexOf(d.CurrentStage) >= 0; });
+    statsHtml = mstat(asgn.length,'Assigned to Me','') + mstat(pend.length,'Pending Check','amber') + mstat(done.length,'Forwarded','green');
+  } else if (role === 'APPROVER') {
+    var asgn2 = allDrawings.filter(function(d){ return (d.AssignedApprover||'').toLowerCase() === email; });
+    var pend2 = asgn2.filter(function(d){ return d.CurrentStage === 'APPROVAL'; });
+    var done2 = asgn2.filter(function(d){ return ['QA','RELEASED'].indexOf(d.CurrentStage) >= 0; });
+    statsHtml = mstat(asgn2.length,'Assigned to Me','') + mstat(pend2.length,'Pending Approval','amber') + mstat(done2.length,'Approved','green');
+  }
+  document.getElementById('dashStats').innerHTML = statsHtml;
+
+  // Chart (admin/QA only)
+  var showChart = ['ADMIN','QA'].indexOf(role) >= 0 && total > 0;
+  document.getElementById('dashChart').style.display = showChart ? '' : 'none';
+  if (showChart) {
+    try {
+      if (typeof Chart !== 'undefined') {
+        var c = document.getElementById('chartCanvas');
+        if (chartInst) { chartInst.destroy(); chartInst = null; }
+        chartInst = new Chart(c.getContext('2d'), {
+          type:'bar',
+          data:{ labels:['Draft','Checking','Approval','QA','Released'],
+                 datasets:[{label:'Drawings',data:[bs.DRAFT,bs.CHECKING,bs.APPROVAL,bs.QA,bs.RELEASED],
+                             backgroundColor:['#F0C040','#4A9FD4','#2B4590','#D62828','#1B6B3A']}]},
+          options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+        });
+      }
+    } catch(e){ console.warn('Chart:', e.message); }
+  }
+
+  // Recent (latest 6 by submission date)
+  var recent = allDrawings.slice().sort(function(a,b){ return new Date(b.SubmittedOn)-new Date(a.SubmittedOn); }).slice(0,6);
+  if (recent.length) {
+    document.getElementById('dashRecent').style.display = '';
+    document.getElementById('dashRecentBody').innerHTML =
+      '<table><thead><tr><th>Drawing No.</th><th>Title</th><th>Stage</th><th>Project</th><th>Submitted</th></tr></thead><tbody>' +
+      recent.map(function(d){
+        return '<tr style="cursor:pointer" onclick="openDM(\''+esc(d.DrawingID)+'\',\'view\')">' +
+          '<td><span class="tbl-id">'+esc(d.DrawingID)+'</span></td>' +
+          '<td>'+esc(d.Title)+'</td><td>'+sbadge(d.CurrentStage)+'</td>' +
+          '<td>'+(esc(d.Project)||'—')+'</td>' +
+          '<td style="font-size:11px;color:var(--muted)">'+fmtDate(d.SubmittedOn)+'</td></tr>';
+      }).join('') + '</tbody></table>';
+  } else {
+    document.getElementById('dashRecent').style.display = 'none';
+  }
+}
+
+function mstat(n, label, cls) {
+  return '<div class="stat-card '+(cls||'')+'"><div class="stat-num">'+n+'</div><div class="stat-lbl">'+label+'</div></div>';
+}
+
+function showDebug(el) {
+  var out = document.getElementById('dbgOut');
+  if (!out) return;
+  out.style.display = '';
+  el.textContent = '⏳ Loading…';
+  gs('serverGetDebugInfo', [CTX.user && CTX.user.email || ''])
+    .then(function(info) {
+      out.textContent =
+        'Email  : ' + info.resolvedEmail + '\nRole   : ' + info.resolvedRole +
+        '\nTotal  : ' + info.totalDrawings + '  |  Visible : ' + info.visibleDrawings +
+        '\n\nSubmittedBy values:\n  ' + (info.submittedByValues.join('\n  ')||'(none)') +
+        '\n\nCheckers in sheet:\n  ' + (info.checkerValues.join('\n  ')||'(none)') +
+        '\n\nUsers registered:\n  ' + (info.usersInSheet.join('\n  ')||'(none)');
+      el.textContent = '▼ Diagnostic info';
+    })
+    .catch(function(e){ out.textContent = 'Error: '+e.message; el.textContent='▼'; });
+}
+
+// ═══════════════════════════════════════════════
+// WORK QUEUE
+// ═══════════════════════════════════════════════
+function renderQueue() {
+  var role  = CTX.user && CTX.user.role;
+  var email = (CTX.user && CTX.user.email) || '';
+  var q = [];
+  if      (role==='CHECKER')  q = allDrawings.filter(function(d){ return d.CurrentStage==='CHECKING' && (d.AssignedChecker||'').toLowerCase()===email; });
+  else if (role==='APPROVER') q = allDrawings.filter(function(d){ return d.CurrentStage==='APPROVAL' && (d.AssignedApprover||'').toLowerCase()===email; });
+  else if (role==='QA')       q = allDrawings.filter(function(d){ return d.CurrentStage==='QA'; });
+  else if (role==='ADMIN')    q = allDrawings.filter(function(d){ return ['CHECKING','APPROVAL','QA'].indexOf(d.CurrentStage)>=0; });
+  else if (role==='DRAFTER')  q = allDrawings.filter(function(d){ return d.CurrentStage==='DRAFT' && (d.SubmittedBy||'').toLowerCase()===email; });
+
+  var badge = document.getElementById('qBadge');
+  if (q.length){ badge.textContent = q.length; badge.style.display=''; } else badge.style.display='none';
+  document.getElementById('qSubtitle').textContent = q.length ? q.length + ' item(s) awaiting your action' : '';
+
+  var tbody = document.getElementById('qBody');
+  if (!q.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="no-data">Nothing pending — you\'re all caught up ✓</td></tr>';
+    return;
+  }
+  var actionLabels = {CHECKING:'Check', APPROVAL:'Approve', QA:'Release', DRAFT:'Resubmit'};
+  tbody.innerHTML = q.map(function(d) {
+    var isDraft = d.CurrentStage === 'DRAFT';
+    var lbl = actionLabels[d.CurrentStage] || 'Review';
+    return '<tr>' +
+      '<td><span class="tbl-id">'+esc(d.DrawingID)+'</span></td>' +
+      '<td>'+esc(d.Title)+'</td>' +
+      '<td style="font-family:var(--mono);font-size:10px">Rev '+esc(d.RevLevel)+'</td>' +
+      '<td>'+sbadge(d.CurrentStage)+'</td>' +
+      '<td>'+(esc(d.Project)||'—')+'</td>' +
+      '<td>'+(esc(d.Client)||'—')+'</td>' +
+      '<td style="font-size:11px;color:var(--muted)">'+fmtDate(d.SubmittedOn)+'</td>' +
+      '<td style="white-space:nowrap">' +
+      (isDraft
+        ? '<button class="btn btn-primary btn-sm" onclick="openDM(\''+esc(d.DrawingID)+'\',\'resubmit\')">↺ Resubmit</button>'
+        : '<button class="btn btn-success btn-sm" onclick="openDM(\''+esc(d.DrawingID)+'\',\'approve\')">'+lbl+' ✓</button> ' +
+          '<button class="btn btn-danger btn-sm" onclick="openDM(\''+esc(d.DrawingID)+'\',\'reject\')">Reject ✗</button>'
+      ) + '</td></tr>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING REGISTER
+// ═══════════════════════════════════════════════
+function renderDrawings() { applyFilters(); }
+
+function applyFilters() {
+  var q   = (document.getElementById('dFilter').value || '').toLowerCase();
+  var st  = document.getElementById('dStage').value;
+  var cat = document.getElementById('dCat').value;
+  var email = (CTX.user && CTX.user.email) || '';
+  var filtered = allDrawings.filter(function(d) {
+    if (st  && d.CurrentStage !== st)   return false;
+    if (cat && d.Category     !== cat)  return false;
+    if (q) {
+      var hay = [(d.DrawingID||''),(d.Title||''),(d.Project||''),(d.Client||''),(d.SubmittedBy||'')].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  document.getElementById('dCount').textContent = filtered.length + ' drawing(s)';
+  var tbody = document.getElementById('dBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data">No drawings match these filters.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(function(d) {
+    var canResub = d.CurrentStage === 'DRAFT' && (d.SubmittedBy||'').toLowerCase() === email;
+    var hasDRL   = d.CurrentStage === 'RELEASED' && d.ReleasedDRLFileID;
+    return '<tr>' +
+      '<td><span class="tbl-id">'+esc(d.DrawingID)+'</span></td>' +
+      '<td>'+esc(d.Title)+'</td>' +
+      '<td style="font-family:var(--mono);font-size:10px">Rev '+esc(d.RevLevel)+'</td>' +
+      '<td style="font-size:11px;color:var(--muted)">'+esc(d.Category||'—')+'</td>' +
+      '<td>'+sbadge(d.CurrentStage)+'</td>' +
+      '<td>'+(esc(d.Project)||'—')+'</td>' +
+      '<td>'+(esc(d.Client)||'—')+'</td>' +
+      '<td style="font-size:11px;color:var(--muted)">'+fmtDate(d.SubmittedOn)+'</td>' +
+      '<td style="white-space:nowrap">' +
+      '<button class="btn btn-outline btn-xs" onclick="openDM(\''+esc(d.DrawingID)+'\',\'view\')">View</button>' +
+      (canResub ? ' <button class="btn btn-primary btn-xs" onclick="openDM(\''+esc(d.DrawingID)+'\',\'resubmit\')">Resubmit</button>' : '') +
+      (hasDRL   ? ' <a class="btn btn-success btn-xs" href="https://drive.google.com/file/d/'+esc(d.ReleasedDRLFileID)+'/view" target="_blank" style="text-decoration:none">DRL ↗</a>' : '') +
+      '</td></tr>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// CHUNKED UPLOAD
+// ═══════════════════════════════════════════════
+var CHUNK = 75000; // ~75KB base64 per chunk (CacheService limit is 100KB per entry)
+
+function handleFileSelect(inp){ if (inp.files[0]) setSelFile(inp.files[0]); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag');
+  if (e.dataTransfer.files[0]) setSelFile(e.dataTransfer.files[0]);
+}
+function setSelFile(f) {
+  selFile = f;
+  document.getElementById('fileChosenName').textContent = f.name + ' (' + (f.size/1024).toFixed(0) + ' KB)';
+  document.getElementById('fileChosen').style.display = 'flex';
+}
+
+function uploadChunked(file, drawingId, pBarId, pLblId, pWrapId) {
+  var pWrap = document.getElementById(pWrapId  || 'submitProgress');
+  var pBar  = document.getElementById(pBarId   || 'submitPBar');
+  var pLbl  = document.getElementById(pLblId   || 'submitPLbl');
+  pWrap.style.display = '';
+  pBar.style.width = '0%';
+
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var b64   = ev.target.result.split(',')[1];
+      var total = Math.ceil(b64.length / CHUNK);
+
+      gs('serverUploadStart', [file.name, drawingId || 'TEMP', total])
+        .then(function(r) {
+          var uid = r.uploadId;
+          var i = 0;
+          function next() {
+            if (i >= total) {
+              pLbl.textContent = 'Finalizing…';
+              return gs('serverUploadFinish', [uid]);
+            }
+            pBar.style.width = Math.round((i / total) * 90) + '%';
+            pLbl.textContent = 'Uploading part ' + (i+1) + ' of ' + total + '…';
+            return gs('serverUploadChunk', [uid, i, b64.slice(i*CHUNK, (i+1)*CHUNK)])
+              .then(function(){ i++; return next(); });
+          }
+          return next();
+        })
+        .then(function(fileId) {
+          pBar.style.width = '100%';
+          pLbl.textContent = 'Upload complete ✓';
+          setTimeout(function(){ pWrap.style.display='none'; }, 1500);
+          resolve(fileId);
+        })
+        .catch(function(e){ pWrap.style.display='none'; reject(e); });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// SUBMIT DRAWING
+// ═══════════════════════════════════════════════
+function submitDrawing() {
+  var title   = (document.getElementById('f-title').value   || '').trim();
+  var checker = document.getElementById('f-checker').value;
+  var approver= document.getElementById('f-approver').value;
+  var alertEl = document.getElementById('submitAlert');
+  halert(alertEl);
+  if (!title)    return salert(alertEl, 'Drawing title is required.', 'error');
+  if (!checker)  return salert(alertEl, 'Please assign a Checker.', 'error');
+  if (!approver) return salert(alertEl, 'Please assign an Approver.', 'error');
+  if (!selFile)  return salert(alertEl, 'Please upload the drawing PDF.', 'error');
+
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Uploading…';
+
+  uploadChunked(selFile, 'TEMP')
+    .then(function(fileId) {
+      btn.innerHTML = '<span class="spin"></span> Submitting…';
+      return gs('serverSubmitDrawing', [CTX.user.email, {
+        title:            title,
+        category:         document.getElementById('f-cat').value,
+        project:          (document.getElementById('f-proj').value   || '').trim(),
+        client:           (document.getElementById('f-client').value || '').trim(),
+        remarks:          (document.getElementById('f-remarks').value|| '').trim(),
+        assignedChecker:  checker,
+        assignedApprover: approver,
+        driveFileId:      fileId
+      }]);
+    })
+    .then(function(r) {
+      salert(alertEl, '✓ Drawing submitted! No: ' + r.drawingId, 'success');
+      btn.disabled = false; btn.innerHTML = 'Submit Drawing →';
+      resetSubmitForm();
+      loadDrawings();
+      toast('Drawing ' + r.drawingId + ' sent for checking.', 's');
+    })
+    .catch(function(e) {
+      salert(alertEl, 'Failed: ' + e.message, 'error');
+      btn.disabled = false; btn.innerHTML = 'Submit Drawing →';
+    });
+}
+
+function resetSubmitForm() {
+  ['f-title','f-proj','f-client','f-remarks'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('f-checker').value = '';
+  document.getElementById('f-approver').value = '';
+  document.getElementById('fileChosen').style.display = 'none';
+  selFile = null;
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING MODAL
+// ═══════════════════════════════════════════════
+function openDM(did, mode) {
+  var d = allDrawings.find(function(x){ return x.DrawingID === did; });
+  if (!d) return;
+  _curDid = did; _curMode = mode || 'view';
+
+  halert(document.getElementById('dmAlert'));
+  document.getElementById('dmRemarks').value = '';
+  document.getElementById('resubFile').value = '';
+  document.getElementById('resubProgress').style.display = 'none';
+
+  // Title
+  document.getElementById('dmTitle').textContent =
+    mode==='approve'  ? 'Review & Approve: ' + d.DrawingID :
+    mode==='reject'   ? 'Reject: ' + d.DrawingID :
+    mode==='resubmit' ? 'Resubmit: ' + d.DrawingID :
+    d.DrawingID + ' — ' + d.Title;
+
+  // Pipeline
+  var stages = ['DRAFT','CHECKING','APPROVAL','QA','RELEASED'];
+  var idx = stages.indexOf(d.CurrentStage);
+  document.getElementById('dmPipeline').innerHTML = stages.map(function(s, i) {
+    var cls = i < idx ? 'done' : i === idx ? 'active' : '';
+    return '<div class="ps '+cls+'"><div class="ps-n">0'+(i+1)+'</div><div class="ps-l">'+s+'</div></div>';
+  }).join('');
+
+  // Info grid
+  var infoRows =
+    '<div class="ig-lbl">Drawing No.</div><div class="ig-val"><b style="font-family:var(--mono)">'+esc(d.DrawingID)+'</b></div>' +
+    '<div class="ig-lbl">Revision</div><div class="ig-val">Rev '+esc(d.RevLevel)+'  '+sbadge(d.CurrentStage)+'</div>' +
+    '<div class="ig-lbl">Title</div><div class="ig-val ig-full">'+esc(d.Title)+'</div>' +
+    '<div class="ig-lbl">Category</div><div class="ig-val">'+esc(d.Category||'—')+'</div>' +
+    '<div class="ig-lbl">Project</div><div class="ig-val">'+esc(d.Project||'—')+'</div>' +
+    '<div class="ig-lbl">Checker</div><div class="ig-val">'+esc(d.AssignedChecker||'—')+'</div>' +
+    '<div class="ig-lbl">Approver</div><div class="ig-val">'+esc(d.AssignedApprover||'—')+'</div>' +
+    '<div class="ig-lbl">Submitted by</div><div class="ig-val">'+esc(d.SubmittedByName||d.SubmittedBy||'—')+' · '+fmtDate(d.SubmittedOn)+'</div>';
+  if (d.CheckedBy)  infoRows += '<div class="ig-lbl">Checked by</div><div class="ig-val">'+esc(d.CheckedBy)+' · '+fmtDate(d.CheckedOn)+'</div>';
+  if (d.ApprovedBy) infoRows += '<div class="ig-lbl">Approved by</div><div class="ig-val">'+esc(d.ApprovedBy)+' · '+fmtDate(d.ApprovedOn)+'</div>';
+  if (d.LastRemarks) infoRows += '<div class="ig-lbl">Last Remarks</div><div class="ig-val ig-full" style="color:var(--amber);font-style:italic">'+esc(d.LastRemarks)+'</div>';
+  document.getElementById('dmInfo').innerHTML = infoRows;
+
+  // PDF
+  if (d.DriveFileID) {
+    document.getElementById('pdfFrame').src = 'https://drive.google.com/file/d/'+d.DriveFileID+'/preview';
+    document.getElementById('dmPdf').style.display = '';
+  } else {
+    document.getElementById('pdfFrame').src = '';
+    document.getElementById('dmPdf').style.display = 'none';
+  }
+
+  // Audit
+  document.getElementById('dmAudit').style.display = '';
+  document.getElementById('dmAuditTl').innerHTML = '<div style="color:var(--muted);font-size:11px">Loading…</div>';
+  gs('serverGetAuditLog', [did])
+    .then(renderAudit)
+    .catch(function(){ document.getElementById('dmAuditTl').innerHTML='<div style="color:var(--muted);font-size:11px">Could not load history.</div>'; });
+
+  // Action area & footer
+  var actionDiv = document.getElementById('dmAction');
+  var footer    = document.getElementById('dmFooter');
+  document.getElementById('dmResubFile').style.display = 'none';
+
+  if (mode === 'view') {
+    actionDiv.style.display = 'none';
+    footer.innerHTML = '<button class="btn btn-outline" onclick="closeDM()">Close</button>' +
+      (d.CurrentStage==='RELEASED'&&d.ReleasedDRLFileID
+        ? '<a class="btn btn-success" href="https://drive.google.com/file/d/'+esc(d.ReleasedDRLFileID)+'/view" target="_blank" style="text-decoration:none">Download DRL ↗</a>'
+        : '');
+  } else if (mode === 'approve') {
+    actionDiv.style.display = '';
+    document.getElementById('dmRemReq').style.display = 'none';
+    document.getElementById('dmRemHint').textContent = 'Optional — add notes for the next reviewer.';
+    footer.innerHTML =
+      '<button class="btn btn-outline" onclick="closeDM()">Cancel</button>' +
+      '<button class="btn btn-success" onclick="doApprove()">✓ Confirm Approve</button>';
+  } else if (mode === 'reject') {
+    actionDiv.style.display = '';
+    document.getElementById('dmRemReq').style.display = '';
+    document.getElementById('dmRemHint').textContent = 'Required — explain the rejection reason clearly.';
+    footer.innerHTML =
+      '<button class="btn btn-outline" onclick="closeDM()">Cancel</button>' +
+      '<button class="btn btn-danger" onclick="doReject()">✗ Confirm Reject</button>';
+  } else if (mode === 'resubmit') {
+    actionDiv.style.display = '';
+    document.getElementById('dmRemReq').style.display = 'none';
+    document.getElementById('dmRemHint').textContent = 'Describe what was corrected from the previous revision.';
+    document.getElementById('dmResubFile').style.display = '';
+    footer.innerHTML =
+      '<button class="btn btn-outline" onclick="closeDM()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="doResubmit()">↺ Resubmit for Checking</button>';
+  }
+
+  document.getElementById('drawingModal').classList.add('open');
+}
+
+function closeDM() {
+  document.getElementById('drawingModal').classList.remove('open');
+  document.getElementById('pdfFrame').src = '';
+}
+
+function renderAudit(entries) {
+  var tl = document.getElementById('dmAuditTl');
+  document.getElementById('dmAudit').style.display = '';
+  if (!entries || !entries.length) {
+    tl.innerHTML = '<div style="color:var(--muted);font-size:11px">No audit history yet.</div>';
+    return;
+  }
+  var icons = {SUBMIT:'📤',APPROVE_CHECK:'✅',APPROVE_APPROVE:'✅',QA_RELEASE:'🏁',REJECT:'❌',RESUBMIT:'🔄'};
+  var dots  = {SUBMIT:'dot-pend',APPROVE_CHECK:'dot-ok',APPROVE_APPROVE:'dot-ok',QA_RELEASE:'dot-ok',REJECT:'dot-no',RESUBMIT:'dot-pend'};
+  tl.innerHTML = entries.slice().reverse().map(function(e) {
+    return '<div class="tl-item"><div class="tl-dot '+(dots[e.action]||'dot-pend')+'">'+(icons[e.action]||'•')+'</div>' +
+      '<div class="tl-body"><div class="tl-act">'+esc(e.action.replace(/_/g,' '))+'</div>' +
+      '<div class="tl-meta">'+esc(e.actorName||e.actorEmail)+' · '+fmtDate(e.timestamp)+'</div>' +
+      (e.remarks ? '<div class="tl-rem">'+esc(e.remarks)+'</div>' : '') +
+      '</div></div>';
+  }).join('');
+}
+
+function doApprove() {
+  var d = allDrawings.find(function(x){ return x.DrawingID === _curDid; }); if (!d) return;
+  var remarks = (document.getElementById('dmRemarks').value || '').trim();
+  var fnMap = {CHECKING:'serverCheckerApprove', APPROVAL:'serverApproverApprove', QA:'serverQaRelease'};
+  var fn = fnMap[d.CurrentStage]; if (!fn) return;
+  showLoad(true, 'Processing…');
+  gs(fn, [CTX.user.email, _curDid, remarks])
+    .then(function(r) {
+      showLoad(false); closeDM();
+      toast(d.CurrentStage === 'QA' ? 'Drawing released! DRL generated.' : 'Drawing forwarded to next stage.', 's');
+      loadDrawings();
+    })
+    .catch(function(e){ showLoad(false); salert(document.getElementById('dmAlert'), e.message, 'error'); });
+}
+
+function doReject() {
+  var remarks = (document.getElementById('dmRemarks').value || '').trim();
+  if (!remarks) return salert(document.getElementById('dmAlert'), 'Remarks are required for rejection.', 'error');
+  showLoad(true, 'Rejecting…');
+  gs('serverRejectDrawing', [CTX.user.email, _curDid, remarks])
+    .then(function() { showLoad(false); closeDM(); toast('Drawing rejected and returned to drafter.', 'e'); loadDrawings(); })
+    .catch(function(e){ showLoad(false); salert(document.getElementById('dmAlert'), e.message, 'error'); });
+}
+
+function doResubmit() {
+  var remarks = (document.getElementById('dmRemarks').value || '').trim();
+  var file    = document.getElementById('resubFile').files[0];
+
+  var proceed = function(fileId) {
+    showLoad(true, 'Resubmitting…');
+    gs('serverResubmitDrawing', [CTX.user.email, _curDid, fileId, remarks])
+      .then(function() { showLoad(false); closeDM(); toast('Resubmitted for checking.', 's'); loadDrawings(); })
+      .catch(function(e){ showLoad(false); salert(document.getElementById('dmAlert'), e.message, 'error'); });
+  };
+
+  if (file) {
+    uploadChunked(file, _curDid, 'resubPBar', 'resubPLbl', 'resubProgress')
+      .then(proceed)
+      .catch(function(e){ salert(document.getElementById('dmAlert'), 'Upload failed: '+e.message, 'error'); });
+  } else {
+    proceed('');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ADMIN: USERS
+// ═══════════════════════════════════════════════
+function renderUsers(users) {
+  var tbody = document.getElementById('usersBody');
+  if (!users || !users.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="no-data">No users found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(function(u) {
+    var isMe = u.email === (CTX.user && CTX.user.email);
+    return '<tr>' +
+      '<td style="font-family:var(--mono);font-size:11px">'+esc(u.email)+'</td>' +
+      '<td>'+esc(u.name)+'</td>' +
+      '<td>'+rbadge(u.role)+'</td>' +
+      '<td style="white-space:nowrap">' +
+      '<button class="btn btn-outline btn-xs" onclick="openUM(\''+esc(u.email)+'\')">Edit</button> ' +
+      (!isMe
+        ? '<button class="btn btn-danger btn-xs" onclick="confirmDelUser(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Delete</button>'
+        : '<span style="font-size:10px;color:var(--muted)">(you)</span>'
+      ) + '</td></tr>';
+  }).join('');
+}
+
+function openUM(emailToEdit) {
+  editEmail = emailToEdit || null;
+  document.getElementById('umTitle').textContent = emailToEdit ? 'Edit User' : 'Add User';
+  halert(document.getElementById('umAlert'));
+  document.getElementById('umEmail').value    = emailToEdit || '';
+  document.getElementById('umEmail').disabled = !!emailToEdit;
+  document.getElementById('umName').value  = '';
+  document.getElementById('umRole').value  = 'DRAFTER';
+  var btn = document.getElementById('saveUserBtn');
+  btn.disabled = false; btn.textContent = 'Save User';
+
+  if (emailToEdit) {
+    gs('serverGetUsers', [CTX.user.email])
+      .then(function(users) {
+        var u = users.find(function(x){ return x.email === emailToEdit; });
+        if (u) { document.getElementById('umName').value = u.name||''; document.getElementById('umRole').value = u.role||'DRAFTER'; }
+      }).catch(function(){});
+  }
+  document.getElementById('userModal').classList.add('open');
+}
+
+function closeUM() {
+  document.getElementById('userModal').classList.remove('open');
+  editEmail = null;
+}
+
+function saveUser() {
+  var email = (document.getElementById('umEmail').value || '').trim().toLowerCase();
+  var name  = (document.getElementById('umName').value  || '').trim();
+  var role  = document.getElementById('umRole').value;
+  var alertEl = document.getElementById('umAlert');
+  if (!email || !email.includes('@')) return salert(alertEl, 'Valid email required.', 'error');
+  if (!name)  return salert(alertEl, 'Name is required.', 'error');
+
+  var btn = document.getElementById('saveUserBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  var fn   = editEmail ? 'serverUpdateUser' : 'serverAddUser';
+  var args = editEmail
+    ? [CTX.user.email, editEmail, name, role]
+    : [CTX.user.email, email, name, role];
+
+  gs(fn, args)
+    .then(function() {
+      closeUM();
+      toast((editEmail ? 'User updated: ' : 'User added: ') + email, 's');
+      loadUsers();
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Save User';
+      salert(alertEl, e.message, 'error');
+    });
+}
+
+function confirmDelUser(email, name) {
+  if (!confirm('Delete user "' + name + '" (' + email + ')?\n\nThis removes them from the system. Their drawings remain.')) return;
+  gs('serverDeleteUser', [CTX.user.email, email])
+    .then(function() { toast('User deleted: ' + email, 'i'); loadUsers(); })
+    .catch(function(e){ toast('Failed: ' + e.message, 'e'); });
+}
+
+// ═══════════════════════════════════════════════
+// ADMIN: SETTINGS
+// ═══════════════════════════════════════════════
+function saveSettings() {
+  var company = (document.getElementById('cfg-company').value || '').trim();
+  var qaEmail = (document.getElementById('cfg-qa').value      || '').trim();
+  var prefix  = (document.getElementById('cfg-prefix').value  || '').trim().toUpperCase();
+  var alertEl = document.getElementById('settingsAlert');
+  var btn     = document.getElementById('saveSettingsBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  var saves = [];
+  if (company) saves.push(gs('serverSaveConfig', [CTX.user.email, 'COMPANY_NAME',   company]));
+  if (qaEmail) saves.push(gs('serverSaveConfig', [CTX.user.email, 'QA_EMAIL',        qaEmail]));
+  if (prefix)  saves.push(gs('serverSaveConfig', [CTX.user.email, 'DRAWING_PREFIX',  prefix]));
+
+  Promise.all(saves)
+    .then(function() {
+      btn.disabled = false; btn.textContent = 'Save Settings';
+      salert(alertEl, '✓ Settings saved successfully.', 'success');
+      toast('Settings updated.', 's');
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Save Settings';
+      salert(alertEl, 'Failed: ' + e.message, 'error');
+    });
+}
+</script>
+</body>
+</html>
