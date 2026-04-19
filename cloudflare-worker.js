@@ -10,7 +10,7 @@
 // The Apps Script URL can change freely — only update it here.
 // ============================================================
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-Xd4tKFqzBpG02VD8rG7EJcRMqwGw77kWqmPJtU8xDS9LUuS1CABPfCqchXM_3nlN/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8J8S5qz62Zm2Y6pdgS9SsgdOLY5OaDlRmfCgwjj5Ou2Gdt3I25ptJHcvKcDsBL5Tz/exec';
 // e.g. 'https://script.google.com/macros/s/AKfycbx.../exec'
 
 const CORS = {
