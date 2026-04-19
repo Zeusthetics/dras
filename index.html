@@ -681,7 +681,7 @@ textarea{resize:vertical;min-height:80px}
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
-<!-- Email Prompt -->
+<!-- Auth Prompt (PIN-based) -->
 <div id="ep">
   <div class="ep-card">
     <div class="ep-head">
@@ -693,14 +693,93 @@ textarea{resize:vertical;min-height:80px}
       <div style="color:rgba(255,255,255,.25);font-size:11px;margin-top:4px;font-weight:300;position:relative;z-index:1">Safex Fire Services Ltd.</div>
     </div>
     <div class="ep-body">
-      <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:20px;font-weight:400;line-height:1.6">Enter your registered email to access your drawings and workflow.</p>
-      <div class="fg" style="margin-bottom:6px">
-        <label>Your Email</label>
-        <input id="epEmail" type="email" placeholder="you@safexfire.com" onkeydown="if(event.key==='Enter')signIn()">
+
+      <!-- Step 1: Email -->
+      <div id="auth-step-email">
+        <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:20px;font-weight:400;line-height:1.6">Enter your @safexfire.com email to sign in.</p>
+        <div class="fg" style="margin-bottom:6px">
+          <label>Your Email</label>
+          <input id="epEmail" type="email" placeholder="you@safexfire.com" onkeydown="if(event.key==='Enter')authStepEmail()">
+        </div>
+        <div id="epErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="authStepEmail()" id="signInBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Continue →</button>
+        <p style="font-size:10px;color:#999;margin-top:10px;text-align:center">Only @safexfire.com accounts are permitted.</p>
       </div>
-      <div id="epErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
-      <button onclick="signIn()" id="signInBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Continue →</button>
-      <p style="font-size:10px;color:#999;margin-top:10px;text-align:center">Email is used only to load your role and drawings.</p>
+
+      <!-- Step 2a: Verify PIN -->
+      <div id="auth-step-pin" style="display:none">
+        <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:6px;font-weight:400;line-height:1.6">Welcome back, <b id="auth-pin-name"></b>.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Enter your 4-digit PIN to continue.</p>
+        <div class="fg" style="margin-bottom:6px">
+          <label>4-Digit PIN</label>
+          <input id="epPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="current-password"
+            style="font-size:24px;letter-spacing:.4em;text-align:center;padding:10px"
+            onkeydown="if(event.key==='Enter')authVerifyPin()" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+        <div id="pinErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="authVerifyPin()" id="verifyPinBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Sign In →</button>
+        <button onclick="authReset()" style="margin-top:8px;width:100%;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer">← Use a different email</button>
+      </div>
+
+      <!-- Step 2b: Set PIN (first time) -->
+      <div id="auth-step-setpin" style="display:none">
+        <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:6px;font-weight:400;line-height:1.6">Hi <b id="auth-setpin-name"></b>, set your PIN.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Create a 4-digit PIN — you'll use this every time you sign in.</p>
+        <div class="fg" style="margin-bottom:10px">
+          <label>New PIN</label>
+          <input id="epNewPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password"
+            style="font-size:24px;letter-spacing:.4em;text-align:center;padding:10px"
+            oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+        <div class="fg" style="margin-bottom:6px">
+          <label>Confirm PIN</label>
+          <input id="epConfPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password"
+            style="font-size:24px;letter-spacing:.4em;text-align:center;padding:10px"
+            onkeydown="if(event.key==='Enter')authSetPin()" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+        <div id="setPinErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="authSetPin()" id="setPinBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Set PIN & Sign In →</button>
+        <button onclick="authReset()" style="margin-top:8px;width:100%;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer">← Use a different email</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Change PIN Modal -->
+<div class="modal-ov" id="changePinModal">
+  <div class="modal modal-sm">
+    <div class="modal-hd">
+      <div class="modal-title">Change PIN</div>
+      <button class="modal-x" onclick="closeChangePinModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="changePinAlert" class="alert"></div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Current PIN</label>
+          <input type="password" id="cpOldPin" inputmode="numeric" maxlength="4" placeholder="Current 4-digit PIN"
+            style="font-size:20px;letter-spacing:.3em;text-align:center" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>New PIN</label>
+          <input type="password" id="cpNewPin" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN"
+            style="font-size:20px;letter-spacing:.3em;text-align:center" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Confirm New PIN</label>
+          <input type="password" id="cpConfPin" inputmode="numeric" maxlength="4" placeholder="Confirm new PIN"
+            style="font-size:20px;letter-spacing:.3em;text-align:center" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeChangePinModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="doChangePin()" id="changePinBtn">Update PIN</button>
     </div>
   </div>
 </div>
@@ -753,7 +832,10 @@ textarea{resize:vertical;min-height:80px}
           <div class="user-rl" id="uRole">—</div>
         </div>
       </div>
-      <button onclick="switchAccount()" class="sw-btn">⇄ Switch Account</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="switchAccount()" class="sw-btn" style="flex:1">⇄ Switch</button>
+        <button onclick="openChangePinModal()" class="sw-btn" style="flex:1" title="Change PIN">🔑 PIN</button>
+      </div>
     </div>
   </aside>
 
@@ -954,6 +1036,34 @@ textarea{resize:vertical;min-height:80px}
             </div>
           </div>
           <button class="btn btn-primary" onclick="saveSettings()" id="saveSettingsBtn">Save Settings</button>
+        </div>
+      </div>
+
+      <!-- Reminder Settings -->
+      <div class="card" style="max-width:500px;margin-top:16px">
+        <div class="card-hd"><div class="card-title">Reminder Notifications</div></div>
+        <div class="card-body">
+          <div id="reminderAlert" class="alert"></div>
+          <div class="form-row full">
+            <div class="fg">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500">
+                <input type="checkbox" id="cfg-reminder-enabled" style="width:16px;height:16px;border-radius:4px;cursor:pointer">
+                Enable daily pending-drawing reminder emails
+              </label>
+              <div class="hint">Sends a digest email to checkers/approvers for drawings waiting more than the threshold.</div>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>Reminder Threshold (days)</label>
+              <input type="number" id="cfg-reminder-days" min="1" max="30" placeholder="2" style="max-width:120px">
+              <div class="hint">Send reminders when a drawing has been pending for this many days (default: 2).</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary" onclick="saveReminderConfig()" id="saveReminderBtn">Save Reminder Settings</button>
+            <button class="btn btn-outline btn-sm" onclick="runReminderNow()" id="runReminderBtn">▶ Run Now (Test)</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1190,52 +1300,250 @@ function toast(msg, type) {
 }
 
 // ═══════════════════════════════════════════════
-// AUTH
+// AUTH — PIN-based
 // ═══════════════════════════════════════════════
+var _authEmail = '';
+var _authToken = '';
+
 window.addEventListener('load', function() {
-  // Show setup warning if API_URL hasn't been configured yet
   if (API_URL.indexOf('YOUR_APPS_SCRIPT') >= 0) {
     document.getElementById('epErr').innerHTML =
       '<b style="color:#D62828">⚠ API_URL not set.</b><br>' +
       'Open <code style="background:#eee;padding:1px 4px">index.html</code>, find ' +
       '<code style="background:#eee;padding:1px 4px">var API_URL</code> and paste your ' +
-      'Apps Script <code style="background:#eee;padding:1px 4px">/exec</code> URL.<br>' +
-      '<span style="color:#888;font-size:10px">Apps Script → Deploy → Manage deployments → copy URL</span>';
+      'Apps Script <code style="background:#eee;padding:1px 4px">/exec</code> URL.';
     document.getElementById('signInBtn').disabled = true;
   }
-  var saved = '';
-  try { saved = localStorage.getItem('dras_email') || ''; } catch(e){}
-  if (saved) document.getElementById('epEmail').value = saved;
-  document.getElementById('ep').style.display = 'flex';
+  // Try to restore session from localStorage
+  var savedToken = '';
+  var savedEmail = '';
+  try {
+    savedToken = localStorage.getItem('dras_token') || '';
+    savedEmail = localStorage.getItem('dras_email') || '';
+  } catch(e){}
+
+  if (savedEmail) document.getElementById('epEmail').value = savedEmail;
+
+  if (savedToken) {
+    // Validate existing session token silently
+    showLoad(true, 'Restoring session…');
+    gs('serverValidateToken', [savedToken])
+      .then(function(r) {
+        if (r && r.ok && r.user) {
+          _authToken = savedToken;
+          _authEmail = r.user.email;
+          showLoad(false);
+          _onAuthSuccess(r.user);
+        } else {
+          showLoad(false);
+          _clearSession();
+          document.getElementById('ep').style.display = 'flex';
+        }
+      })
+      .catch(function() {
+        showLoad(false);
+        _clearSession();
+        document.getElementById('ep').style.display = 'flex';
+      });
+  } else {
+    document.getElementById('ep').style.display = 'flex';
+  }
 });
 
-function signIn() {
-  var email = (document.getElementById('epEmail').value || '').trim();
+function authReset() {
+  _showAuthStep('email');
+  document.getElementById('epErr').textContent = '';
+  document.getElementById('epEmail').value = '';
+  document.getElementById('epEmail').focus();
+}
+
+function _showAuthStep(step) {
+  ['email','pin','setpin'].forEach(function(s){
+    document.getElementById('auth-step-'+s).style.display = s === step ? '' : 'none';
+  });
+}
+
+function authStepEmail() {
+  var email = (document.getElementById('epEmail').value || '').trim().toLowerCase();
   var err   = document.getElementById('epErr');
   if (!email || !email.includes('@')) { err.textContent = 'Enter a valid email.'; return; }
   err.textContent = '';
-  try { localStorage.setItem('dras_email', email.toLowerCase()); } catch(e){}
   var btn = document.getElementById('signInBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Signing in…';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Checking…';
 
-  gs('serverGetContext', [email])
-    .then(function(ctx) {
-      try {
-        CTX = ctx;
-        applyCtx();
-        document.getElementById('ep').style.display = 'none';
-        loadDrawings();
-      } catch(e) {
-        btn.disabled = false; btn.innerHTML = 'Continue →';
-        err.textContent = 'Error: ' + e.message;
+  gs('serverCheckEmail', [email])
+    .then(function(r) {
+      btn.disabled = false; btn.innerHTML = 'Continue →';
+      _authEmail = email;
+      try { localStorage.setItem('dras_email', email); } catch(e){}
+
+      if (!r.exists) {
+        err.textContent = 'Email not registered. Ask your DRAS admin to add your account.';
+        return;
+      }
+      if (r.hasPin) {
+        document.getElementById('auth-pin-name').textContent = r.name || email.split('@')[0];
+        document.getElementById('epPin').value = '';
+        document.getElementById('pinErr').textContent = '';
+        _showAuthStep('pin');
+        setTimeout(function(){ document.getElementById('epPin').focus(); }, 80);
+      } else {
+        document.getElementById('auth-setpin-name').textContent = r.name || email.split('@')[0];
+        document.getElementById('epNewPin').value = '';
+        document.getElementById('epConfPin').value = '';
+        document.getElementById('setPinErr').textContent = '';
+        _showAuthStep('setpin');
+        setTimeout(function(){ document.getElementById('epNewPin').focus(); }, 80);
       }
     })
     .catch(function(e) {
       btn.disabled = false; btn.innerHTML = 'Continue →';
-      err.textContent = 'Failed: ' + e.message;
+      err.textContent = e.message;
     });
 }
 
+function authVerifyPin() {
+  var pin = (document.getElementById('epPin').value || '').trim();
+  var err = document.getElementById('pinErr');
+  if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN must be 4 digits.'; return; }
+  err.textContent = '';
+  var btn = document.getElementById('verifyPinBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Verifying…';
+
+  gs('serverVerifyPin', [_authEmail, pin])
+    .then(function(r) {
+      btn.disabled = false; btn.innerHTML = 'Sign In →';
+      if (r && r.ok) {
+        _authToken = r.token;
+        try { localStorage.setItem('dras_token', r.token); } catch(e){}
+        _onAuthSuccess(r.user);
+      } else {
+        err.textContent = 'Incorrect PIN.';
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.innerHTML = 'Sign In →';
+      err.textContent = e.message;
+    });
+}
+
+function authSetPin() {
+  var pin  = (document.getElementById('epNewPin').value  || '').trim();
+  var conf = (document.getElementById('epConfPin').value || '').trim();
+  var err  = document.getElementById('setPinErr');
+  if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN must be exactly 4 digits.'; return; }
+  if (pin !== conf)          { err.textContent = 'PINs do not match.'; return; }
+  err.textContent = '';
+  var btn = document.getElementById('setPinBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Setting PIN…';
+
+  gs('serverSetPin', [_authEmail, pin])
+    .then(function(r) {
+      btn.disabled = false; btn.innerHTML = 'Set PIN & Sign In →';
+      if (r && r.ok) {
+        _authToken = r.token;
+        try { localStorage.setItem('dras_token', r.token); } catch(e){}
+        _onAuthSuccess(r.user);
+      } else {
+        err.textContent = 'Failed to set PIN.';
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.innerHTML = 'Set PIN & Sign In →';
+      err.textContent = e.message;
+    });
+}
+
+function _onAuthSuccess(user) {
+  document.getElementById('ep').style.display = 'none';
+  _showAuthStep('email');
+  // Load context and start app
+  showLoad(true, 'Loading workspace…');
+  gs('serverGetContext', [user.email])
+    .then(function(ctx) {
+      CTX = ctx;
+      applyCtx();
+      loadDrawings();
+    })
+    .catch(function(e) {
+      showLoad(false);
+      toast('Failed to load context: ' + e.message, 'e');
+    });
+}
+
+function _clearSession() {
+  try { localStorage.removeItem('dras_token'); } catch(e){}
+  _authToken = '';
+  _authEmail = '';
+}
+
+function switchAccount() {
+  // Sign out server-side token
+  if (_authToken) {
+    gs('serverSignOut', [_authToken]).catch(function(){});
+  }
+  _clearSession();
+  try { localStorage.removeItem('dras_email'); } catch(e){}
+  CTX = {}; allDrawings = [];
+  document.getElementById('epEmail').value = '';
+  document.getElementById('epErr').textContent = '';
+  document.getElementById('epPin').value = '';
+  document.getElementById('pinErr').textContent = '';
+  var btn = document.getElementById('signInBtn');
+  btn.disabled = false; btn.innerHTML = 'Continue →';
+  _showAuthStep('email');
+  document.getElementById('ep').style.display = 'flex';
+}
+
+// Keep legacy signIn as no-op fallback
+function signIn() { authStepEmail(); }
+
+// ── Change PIN ────────────────────────────────────────────────
+function openChangePinModal() {
+  halert(document.getElementById('changePinAlert'));
+  ['cpOldPin','cpNewPin','cpConfPin'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('changePinBtn').disabled = false;
+  document.getElementById('changePinBtn').textContent = 'Update PIN';
+  document.getElementById('changePinModal').classList.add('open');
+}
+function closeChangePinModal() {
+  document.getElementById('changePinModal').classList.remove('open');
+}
+function doChangePin() {
+  var oldPin  = (document.getElementById('cpOldPin').value  || '').trim();
+  var newPin  = (document.getElementById('cpNewPin').value  || '').trim();
+  var confPin = (document.getElementById('cpConfPin').value || '').trim();
+  var alertEl = document.getElementById('changePinAlert');
+  if (!/^\d{4}$/.test(oldPin)) return salert(alertEl,'Current PIN must be 4 digits.','error');
+  if (!/^\d{4}$/.test(newPin)) return salert(alertEl,'New PIN must be 4 digits.','error');
+  if (newPin !== confPin)      return salert(alertEl,'New PINs do not match.','error');
+  var btn = document.getElementById('changePinBtn');
+  btn.disabled = true; btn.textContent = 'Updating…';
+  gs('serverChangePin', [CTX.user.email, oldPin, newPin])
+    .then(function(r) {
+      btn.disabled = false; btn.textContent = 'Update PIN';
+      if (r && r.ok) {
+        closeChangePinModal();
+        toast('PIN updated successfully.', 's');
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Update PIN';
+      salert(alertEl, e.message, 'error');
+    });
+}
+
+// ── Admin: Reset another user's PIN ──────────────────────────
+function adminResetPin(targetEmail, targetName) {
+  if (!confirm('Reset PIN for "' + targetName + '" (' + targetEmail + ')?\n\nThey will be prompted to set a new PIN on next login.')) return;
+  gs('serverAdminResetPin', [CTX.user.email, targetEmail])
+    .then(function(r) { toast('PIN reset for ' + targetEmail + '.', 'i'); })
+    .catch(function(e){ toast('Failed: ' + e.message, 'e'); });
+}
+
+// ═══════════════════════════════════════════════
+// APPLY CONTEXT (after auth)
+// ═══════════════════════════════════════════════
 function applyCtx() {
   var u = CTX.user;
   document.getElementById('uName').textContent = u.name;
@@ -1261,15 +1569,6 @@ function applyCtx() {
   document.getElementById('nav-settings').style.display    = isAdmin ? '' : 'none';
 }
 
-function switchAccount() {
-  try { localStorage.removeItem('dras_email'); } catch(e){}
-  CTX = {}; allDrawings = [];
-  document.getElementById('epEmail').value = '';
-  document.getElementById('epErr').textContent = '';
-  var btn = document.getElementById('signInBtn');
-  btn.disabled = false; btn.innerHTML = 'Continue →';
-  document.getElementById('ep').style.display = 'flex';
-}
 
 // ═══════════════════════════════════════════════
 // NAVIGATION
@@ -1351,6 +1650,45 @@ function loadSettings() {
       document.getElementById('cfg-prefix').value  = cfg.DRAWING_PREFIX  || 'WM';
     })
     .catch(function(){});
+  // Also load reminder config
+  gs('serverGetReminderConfig', [CTX.user && CTX.user.email])
+    .then(function(r) {
+      document.getElementById('cfg-reminder-enabled').checked = !!r.enabled;
+      document.getElementById('cfg-reminder-days').value      = r.thresholdDays || 2;
+    })
+    .catch(function(){});
+}
+
+function saveReminderConfig() {
+  var enabled = document.getElementById('cfg-reminder-enabled').checked;
+  var days    = parseInt(document.getElementById('cfg-reminder-days').value, 10) || 2;
+  var alertEl = document.getElementById('reminderAlert');
+  var btn     = document.getElementById('saveReminderBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  gs('serverSaveReminderConfig', [CTX.user.email, enabled, days])
+    .then(function() {
+      btn.disabled = false; btn.textContent = 'Save Reminder Settings';
+      salert(alertEl, '✓ Reminder settings saved.', 'success');
+      toast('Reminder settings updated.', 's');
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Save Reminder Settings';
+      salert(alertEl, 'Failed: ' + e.message, 'error');
+    });
+}
+
+function runReminderNow() {
+  var btn = document.getElementById('runReminderBtn');
+  btn.disabled = true; btn.textContent = 'Running…';
+  gs('serverRunReminderCheck', [CTX.user.email])
+    .then(function() {
+      btn.disabled = false; btn.textContent = '▶ Run Now (Test)';
+      toast('Reminder check triggered — emails sent if any drawings are overdue.', 'i');
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = '▶ Run Now (Test)';
+      toast('Reminder run failed: ' + e.message, 'e');
+    });
 }
 
 // ═══════════════════════════════════════════════
@@ -2001,7 +2339,8 @@ function renderUsers(users) {
       '<td style="white-space:nowrap">' +
       '<button class="btn btn-outline btn-xs" onclick="openUM(\''+esc(u.email)+'\')">Edit</button> ' +
       (!isMe
-        ? '<button class="btn btn-danger btn-xs" onclick="confirmDelUser(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Delete</button>'
+        ? '<button class="btn btn-outline btn-xs" onclick="adminResetPin(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Reset PIN</button> ' +
+          '<button class="btn btn-danger btn-xs" onclick="confirmDelUser(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Delete</button>'
         : '<span style="font-size:10px;color:var(--muted)">(you)</span>'
       ) + '</td></tr>';
   }).join('');
