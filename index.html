@@ -607,9 +607,18 @@ function esc(s) {
 // Content-Type: text/plain bypasses CORS — fetch() works directly
 // from GitHub Pages, local file, anywhere.
 // If the URL ever changes, update this one line and push.
-  //Your_APPSCRIPT_URL_BELOW
 var API_URL = 'https://script.google.com/macros/s/AKfycbwqoUI-3FrhQuRUA92jke6gqG6bIB_Tmp3CI9ZaK-nDUF7b8cH4NvZ_84spTZanaWVg/exec';
-// e.g. 'https://script.google.com/macros/s/AKfycbx.../exec'
+// ↑ PASTE YOUR APPS SCRIPT /exec URL HERE — this is the only thing you need to set
+// e.g. 'https://script.google.com/macros/s/AKfycbx_LONG_ID_HERE/exec'
+//
+// HOW TO GET IT:
+// Apps Script editor → Deploy → Manage deployments → copy the Web App URL
+//
+// CHECKLIST if you get "Failed to fetch":
+//   1. API_URL set to your actual /exec URL (not the placeholder above)
+//   2. Apps Script deployed with access: "Anyone"  (not "Only myself")
+//   3. Apps Script deployed with execute as: "Me" (USER_DEPLOYING)
+//   4. You authorised the script when prompted on first deployment
 
 // Maps serverFunctionName → { action, payload builder }
 var ACTION_MAP = {
@@ -654,20 +663,35 @@ function gs(fn, args) {
     if (!mapper) { rej(new Error('Unknown function: ' + fn)); return; }
     var payload = mapper(args || []);
 
+    // Apps Script cross-origin fetch:
+    // - Content-Type: text/plain avoids CORS preflight
+    // - redirect: 'follow' handles the Apps Script 302 redirect
+    // - No-cache header prevents stale responses
     fetch(API_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify(payload)
+      method:   'POST',
+      redirect: 'follow',
+      headers:  {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
     })
-    .then(function(r) { return r.json(); })
     .then(function(r) {
-      if (r && r.ok) {
-        res(r.data);
-      } else {
-        rej(new Error(r.error || 'Server error'));
+      if (!r.ok && r.status !== 200) {
+        throw new Error('HTTP ' + r.status + ' — check API_URL is correct and Apps Script is deployed as "Anyone"');
       }
+      return r.text();
     })
-    .catch(function(e) { rej(new Error('Network error: ' + e.message)); });
+    .then(function(txt) {
+      var r;
+      try { r = JSON.parse(txt); }
+      catch(e) { throw new Error('Bad response from server. Raw: ' + txt.slice(0, 120)); }
+      if (r && r.ok) { res(r.data); }
+      else { rej(new Error(r.error || 'Server returned error')); }
+    })
+    .catch(function(e) {
+      // Distinguish network error from server error for easier debugging
+      rej(new Error(e.message.includes('fetch') ? 'Cannot reach server. Check API_URL in index.html.' : e.message));
+    });
   });
 }
 
@@ -710,7 +734,16 @@ function toast(msg, type) {
 // AUTH
 // ═══════════════════════════════════════════════
 window.addEventListener('load', function() {
-  // HTML now served from GitHub Pages — no Apps Script dependency on page load
+  // Show setup warning if API_URL hasn't been configured yet
+  if (API_URL.indexOf('YOUR_APPS_SCRIPT') >= 0) {
+    document.getElementById('epErr').innerHTML =
+      '<b style="color:#D62828">⚠ API_URL not set.</b><br>' +
+      'Open <code style="background:#eee;padding:1px 4px">index.html</code>, find ' +
+      '<code style="background:#eee;padding:1px 4px">var API_URL</code> and paste your ' +
+      'Apps Script <code style="background:#eee;padding:1px 4px">/exec</code> URL.<br>' +
+      '<span style="color:#888;font-size:10px">Apps Script → Deploy → Manage deployments → copy URL</span>';
+    document.getElementById('signInBtn').disabled = true;
+  }
   var saved = '';
   try { saved = localStorage.getItem('dras_email') || ''; } catch(e){}
   if (saved) document.getElementById('epEmail').value = saved;
