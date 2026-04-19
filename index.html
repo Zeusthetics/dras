@@ -602,9 +602,13 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// ── API config — set WORKER_URL after deploying Cloudflare Worker ──
-var WORKER_URL = 'YOUR_CLOUDFLARE_WORKER_URL_HERE';
-// e.g. 'https://dras-proxy.yourname.workers.dev'
+// ── API config ───────────────────────────────────────────────
+// Paste your Apps Script /exec URL here. No proxy needed.
+// Content-Type: text/plain bypasses CORS — fetch() works directly
+// from GitHub Pages, local file, anywhere.
+// If the URL ever changes, update this one line and push.
+var API_URL = 'https://script.google.com/macros/s/AKfycbw8J8S5qz62Zm2Y6pdgS9SsgdOLY5OaDlRmfCgwjj5Ou2Gdt3I25ptJHcvKcDsBL5Tz/exec';
+// e.g. 'https://script.google.com/macros/s/AKfycbx.../exec'
 
 // Maps serverFunctionName → { action, payload builder }
 var ACTION_MAP = {
@@ -649,7 +653,7 @@ function gs(fn, args) {
     if (!mapper) { rej(new Error('Unknown function: ' + fn)); return; }
     var payload = mapper(args || []);
 
-    fetch(WORKER_URL, {
+    fetch(API_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
       body:    JSON.stringify(payload)
