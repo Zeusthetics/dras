@@ -1777,97 +1777,97 @@ function runReminderNow() {
 function renderDashboard() {
   var role  = CTX.user && CTX.user.role;
   var email = (CTX.user && CTX.user.email) || '';
-  var bs = { DRAFT:0, CHECKING:0, APPROVAL:0, QA:0, RELEASED:0 };
-  allDrawings.forEach(function(d){ if (bs[d.CurrentStage] !== undefined) bs[d.CurrentStage]++; });
   var total = allDrawings.length;
 
-  if (total === 0 && ['ADMIN','QA'].indexOf(role) < 0) {
-    document.getElementById('dashStats').innerHTML =
-      '<div style="grid-column:1/-1"><div class="empty-st">'+
-      '<div class="es-icon">🔍</div>'+
-      '<div class="es-title">No drawings visible to <span style="font-family:var(--mono);color:var(--red)">'+esc(email)+'</span></div>'+
-      '<div class="es-sub" style="max-width:460px;margin:0 auto">'+
-        'Your account (role: <b>'+esc(role)+'</b>) has no drawings assigned yet.<br>'+
-        'If drawings exist in the sheet, your email may not match. Check below.'+
-      '</div>'+
-      (role==='DRAFTER' ? '<button onclick="showView(\'submit\')" class="btn btn-primary" style="margin-top:14px">Submit New Drawing →</button>' : '')+
-      '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'+
-        '<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Account Diagnostic</div>'+
-        '<pre id="dbgOut" style="background:#1A1A1A;color:#7EC8C8;font-size:10px;padding:12px;text-align:left;white-space:pre-wrap;border-radius:2px;min-height:60px">Loading diagnostic…</pre>'+
-      '</div>'+
-      '</div></div>';
-    document.getElementById('dashChart').style.display = 'none';
-    document.getElementById('dashRecent').style.display = 'none';
-    // Auto-run diagnostic so user immediately sees the email mismatch
-    gs('serverGetDebugInfo', [email])
-      .then(function(info) {
-        var out = document.getElementById('dbgOut');
-        if (!out) return;
-        out.textContent =
-          'Your email : ' + info.resolvedEmail +
-          '\nYour role  : ' + info.resolvedRole +
-          '\nTotal drawings in sheet  : ' + info.totalDrawings +
-          '\nVisible to your account  : ' + info.visibleDrawings +
-          '\n\nSubmittedBy values in sheet (sign in as one of these to see drawings):\n  ' +
-          (info.submittedByValues.join('\n  ') || '(none — sheet may be empty)') +
-          '\n\nAssigned Checkers in sheet:\n  ' + (info.checkerValues.join('\n  ')  || '(none)') +
-          '\n\nAll registered users:\n  '       + (info.usersInSheet.join('\n  ')   || '(none)');
-      })
-      .catch(function(e) {
-        var out = document.getElementById('dbgOut');
-        if (out) out.textContent = 'Diagnostic error: ' + e.message;
-      });
+  // Global stage buckets (all drawings this user can see)
+  var bs = { DRAFT:0, CHECKING:0, APPROVAL:0, QA:0, RELEASED:0 };
+  allDrawings.forEach(function(d){ if (bs[d.CurrentStage] !== undefined) bs[d.CurrentStage]++; });
+
+  // ── Zero-state: truly no drawings accessible ──────────────
+  if (total === 0) {
+    var isAdminOrQA = ['ADMIN','QA'].indexOf(role) >= 0;
+    if (isAdminOrQA) {
+      // ADMIN/QA should see everything — run sheet inspector
+      document.getElementById('dashStats').innerHTML =
+        '<div style="grid-column:1/-1;padding:18px 20px;background:#FFF3CD;border:1px solid #FFE083;font-size:13px">' +
+        '<b>⚠ No drawings found</b> — ' + esc(role) + ' should see all drawings. Running sheet diagnostic…<br>' +
+        '<pre id="inspOut" style="margin-top:10px;background:#1A1A1A;color:#7EC8C8;font-size:10px;padding:12px;white-space:pre-wrap;border-radius:2px;min-height:80px">Inspecting sheet…</pre>' +
+        '</div>';
+      document.getElementById('dashChart').style.display = 'none';
+      document.getElementById('dashRecent').style.display = 'none';
+      gs('serverInspectSheet', [])
+        .then(function(info) {
+          var out = document.getElementById('inspOut');
+          if (!out) return;
+          if (info.error) { out.textContent = 'Sheet error: ' + info.error; return; }
+          out.textContent =
+            'Sheet: "' + info.sheetName + '"  |  Total rows (incl. header): ' + info.totalRows +
+            '  |  Non-empty data rows: ' + info.nonEmptyRows +
+            '\n\nHeader row:\n  ' + (info.headerRow || []).join(' | ') +
+            '\n\nFirst 5 data rows (cols 1–8):\n' +
+            (info.sampleRows && info.sampleRows.length
+              ? info.sampleRows.map(function(r,i){ return '  ['+(i+1)+']: '+JSON.stringify(r); }).join('\n')
+              : '  (no data rows)') +
+            '\n\n── Debug info ──';
+          return gs('serverGetDebugInfo', [email]);
+        })
+        .then(function(dbg) {
+          if (!dbg) return;
+          var out = document.getElementById('inspOut');
+          if (!out) return;
+          out.textContent += '\nResolved email: ' + dbg.resolvedEmail +
+            '  |  role: ' + dbg.resolvedRole +
+            '\nTotal drawings returned by SheetDAO: ' + dbg.totalDrawings +
+            '\nSubmittedBy values: ' + (dbg.submittedByValues.join(', ') || '(none)') +
+            '\nUsers in sheet: ' + (dbg.usersInSheet.join(', ') || '(none)');
+        })
+        .catch(function(e) {
+          var out = document.getElementById('inspOut');
+          if (out) out.textContent = 'Inspect error: ' + e.message;
+        });
+    } else {
+      // Non-admin with zero drawings — show friendly empty state + diagnostic
+      document.getElementById('dashStats').innerHTML =
+        '<div style="grid-column:1/-1"><div class="empty-st">'+
+        '<div class="es-icon">🔍</div>'+
+        '<div class="es-title">No drawings visible to <span style="font-family:var(--mono);color:var(--red)">'+esc(email)+'</span></div>'+
+        '<div class="es-sub" style="max-width:460px;margin:0 auto">'+
+          'Your account (role: <b>'+esc(role)+'</b>) has no drawings assigned yet.<br>'+
+          'If drawings exist in the sheet, your email may not match. Check below.'+
+        '</div>'+
+        (role==='DRAFTER' ? '<button onclick="showView(\'submit\')" class="btn btn-primary" style="margin-top:14px">Submit New Drawing →</button>' : '')+
+        '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'+
+          '<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Account Diagnostic</div>'+
+          '<pre id="dbgOut" style="background:#1A1A1A;color:#7EC8C8;font-size:10px;padding:12px;text-align:left;white-space:pre-wrap;border-radius:2px;min-height:60px">Loading diagnostic…</pre>'+
+        '</div>'+
+        '</div></div>';
+      document.getElementById('dashChart').style.display = 'none';
+      document.getElementById('dashRecent').style.display = 'none';
+      gs('serverGetDebugInfo', [email])
+        .then(function(info) {
+          var out = document.getElementById('dbgOut');
+          if (!out) return;
+          out.textContent =
+            'Your email : ' + info.resolvedEmail +
+            '\nYour role  : ' + info.resolvedRole +
+            '\nTotal drawings in sheet  : ' + info.totalDrawings +
+            '\nVisible to your account  : ' + info.visibleDrawings +
+            '\n\nSubmittedBy values in sheet (sign in as one of these to see drawings):\n  ' +
+            (info.submittedByValues.join('\n  ') || '(none — sheet may be empty)') +
+            '\n\nAssigned Checkers in sheet:\n  ' + (info.checkerValues.join('\n  ')  || '(none)') +
+            '\n\nAll registered users:\n  '       + (info.usersInSheet.join('\n  ')   || '(none)');
+        })
+        .catch(function(e) {
+          var out = document.getElementById('dbgOut');
+          if (out) out.textContent = 'Diagnostic error: ' + e.message;
+        });
+    }
     return;
   }
 
-  // ADMIN/QA with zero drawings — run sheet inspector to find out why
-  if (total === 0 && ['ADMIN','QA'].indexOf(role) >= 0) {
-    document.getElementById('dashStats').innerHTML =
-      '<div style="grid-column:1/-1;padding:18px 20px;background:#FFF3CD;border:1px solid #FFE083;font-size:13px">' +
-      '<b>⚠ No drawings found</b> — ' + esc(role) + ' should see all drawings. Running sheet diagnostic…<br>' +
-      '<pre id="inspOut" style="margin-top:10px;background:#1A1A1A;color:#7EC8C8;font-size:10px;padding:12px;white-space:pre-wrap;border-radius:2px;min-height:80px">Inspecting sheet…</pre>' +
-      '</div>';
-    document.getElementById('dashChart').style.display = 'none';
-    document.getElementById('dashRecent').style.display = 'none';
-    // Call the raw sheet inspector — no role check, always works
-    gs('serverInspectSheet', [])
-      .then(function(info) {
-        var out = document.getElementById('inspOut');
-        if (!out) return;
-        if (info.error) { out.textContent = 'Sheet error: ' + info.error; return; }
-        out.textContent =
-          'Sheet: "' + info.sheetName + '"  |  Total rows (incl. header): ' + info.totalRows +
-          '  |  Non-empty data rows: ' + info.nonEmptyRows +
-          '\n\nHeader row:\n  ' + (info.headerRow || []).join(' | ') +
-          '\n\nFirst 5 data rows (cols 1–8):\n' +
-          (info.sampleRows && info.sampleRows.length
-            ? info.sampleRows.map(function(r,i){ return '  ['+(i+1)+']: '+JSON.stringify(r); }).join('\n')
-            : '  (no data rows)') +
-          '\n\n── Debug info ──' ;
-        // Chain with getDebugInfo to see user resolution
-        return gs('serverGetDebugInfo', [email]);
-      })
-      .then(function(dbg) {
-        if (!dbg) return;
-        var out = document.getElementById('inspOut');
-        if (!out) return;
-        out.textContent += '\nResolved email: ' + dbg.resolvedEmail +
-          '  |  role: ' + dbg.resolvedRole +
-          '\nTotal drawings returned by SheetDAO: ' + dbg.totalDrawings +
-          '\nSubmittedBy values: ' + (dbg.submittedByValues.join(', ') || '(none)') +
-          '\nUsers in sheet: ' + (dbg.usersInSheet.join(', ') || '(none)');
-      })
-      .catch(function(e) {
-        var out = document.getElementById('inspOut');
-        if (out) out.textContent = 'Inspect error: ' + e.message;
-      });
-    return;
-  }
-
-  // Warn if total > 0 but all stage buckets are 0 (CurrentStage values don't match expected)
+  // ── Stage mismatch guard ──────────────────────────────────
   var stageTotal = bs.DRAFT + bs.CHECKING + bs.APPROVAL + bs.QA + bs.RELEASED;
   if (total > 0 && stageTotal === 0) {
-    // Collect the actual unique stage values from the sheet for diagnostics
     var actualStages = {};
     allDrawings.forEach(function(d){ actualStages[d.CurrentStage || '(blank)'] = true; });
     document.getElementById('dashStats').innerHTML =
@@ -1881,48 +1881,77 @@ function renderDashboard() {
     return;
   }
 
-  // Build stats HTML
-  var statsHtml = '';
+  // ── Role-scoped subsets ───────────────────────────────────
+  // Each role sees stats + chart + recent for THEIR relevant drawings.
+  var myDrawings   = allDrawings; // default: all (ADMIN / QA)
+  var statsHtml    = '';
+  // Chart data — may differ from global bs for non-admin roles
+  var chartDrawings = allDrawings;
+
   if (['ADMIN','QA'].indexOf(role) >= 0) {
     statsHtml =
-      mstat(total, 'Total', '') +
-      mstat(bs.DRAFT,    'Draft / Returned', 'amber') +
-      mstat(bs.CHECKING, 'In Checking', 'blue') +
-      mstat(bs.APPROVAL, 'In Approval', 'blue') +
-      mstat(bs.QA,       'Awaiting QA',  'red') +
-      mstat(bs.RELEASED, 'Released',     'green');
+      mstat(total,        'Total',            '') +
+      mstat(bs.DRAFT,     'Draft / Returned', 'amber') +
+      mstat(bs.CHECKING,  'In Checking',      'blue') +
+      mstat(bs.APPROVAL,  'In Approval',      'blue') +
+      mstat(bs.QA,        'Awaiting QA',      'red') +
+      mstat(bs.RELEASED,  'Released',         'green');
+
   } else if (role === 'DRAFTER') {
-    var mine = allDrawings.filter(function(d){ return (d.SubmittedBy||'').toLowerCase() === email; });
+    myDrawings    = allDrawings.filter(function(d){ return (d.SubmittedBy||'').toLowerCase() === email; });
+    chartDrawings = myDrawings;
     var ms = {DRAFT:0,CHECKING:0,APPROVAL:0,QA:0,RELEASED:0};
-    mine.forEach(function(d){ if(ms[d.CurrentStage]!==undefined) ms[d.CurrentStage]++; });
+    myDrawings.forEach(function(d){ if(ms[d.CurrentStage]!==undefined) ms[d.CurrentStage]++; });
     statsHtml =
-      mstat(mine.length, 'My Submissions', '') +
-      mstat(ms.DRAFT, 'Needs Resubmit', 'amber') +
-      mstat(ms.CHECKING + ms.APPROVAL + ms.QA, 'In Review', 'blue') +
-      mstat(ms.RELEASED, 'Released', 'green');
+      mstat(myDrawings.length,                      'My Submissions',  '') +
+      mstat(ms.DRAFT,                               'Needs Resubmit',  'amber') +
+      mstat(ms.CHECKING + ms.APPROVAL + ms.QA,      'In Review',       'blue') +
+      mstat(ms.RELEASED,                            'Released',        'green');
+
   } else if (role === 'CHECKER') {
-    var asgn  = allDrawings.filter(function(d){ return (d.AssignedChecker||'').toLowerCase() === email; });
-    var pend  = asgn.filter(function(d){ return d.CurrentStage === 'CHECKING'; });
-    var done  = asgn.filter(function(d){ return ['APPROVAL','QA','RELEASED'].indexOf(d.CurrentStage) >= 0; });
-    statsHtml = mstat(asgn.length,'Assigned to Me','') + mstat(pend.length,'Pending Check','amber') + mstat(done.length,'Forwarded','green');
+    myDrawings    = allDrawings.filter(function(d){ return (d.AssignedChecker||'').toLowerCase() === email; });
+    chartDrawings = myDrawings;
+    var cs = {DRAFT:0,CHECKING:0,APPROVAL:0,QA:0,RELEASED:0};
+    myDrawings.forEach(function(d){ if(cs[d.CurrentStage]!==undefined) cs[d.CurrentStage]++; });
+    statsHtml =
+      mstat(myDrawings.length,                                       'Assigned to Me',  '') +
+      mstat(cs.CHECKING,                                             'Pending Check',   'amber') +
+      mstat(cs.APPROVAL + cs.QA,                                     'In Progress',     'blue') +
+      mstat(cs.RELEASED,                                             'Released',        'green');
+
   } else if (role === 'APPROVER') {
-    var asgn2 = allDrawings.filter(function(d){ return (d.AssignedApprover||'').toLowerCase() === email; });
-    var pend2 = asgn2.filter(function(d){ return d.CurrentStage === 'APPROVAL'; });
-    var done2 = asgn2.filter(function(d){ return ['QA','RELEASED'].indexOf(d.CurrentStage) >= 0; });
-    statsHtml = mstat(asgn2.length,'Assigned to Me','') + mstat(pend2.length,'Pending Approval','amber') + mstat(done2.length,'Approved','green');
+    myDrawings    = allDrawings.filter(function(d){ return (d.AssignedApprover||'').toLowerCase() === email; });
+    chartDrawings = myDrawings;
+    var as2 = {DRAFT:0,CHECKING:0,APPROVAL:0,QA:0,RELEASED:0};
+    myDrawings.forEach(function(d){ if(as2[d.CurrentStage]!==undefined) as2[d.CurrentStage]++; });
+    statsHtml =
+      mstat(myDrawings.length,   'Assigned to Me',   '') +
+      mstat(as2.APPROVAL,        'Pending Approval', 'amber') +
+      mstat(as2.QA,              'Awaiting QA',      'blue') +
+      mstat(as2.RELEASED,        'Released',         'green');
   }
+
   document.getElementById('dashStats').innerHTML = statsHtml;
 
-  // Chart (admin/QA only)
-  var showChart = ['ADMIN','QA'].indexOf(role) >= 0 && total > 0;
+  // ── Pipeline distribution chart (all roles) ───────────────
+  var chartBs = {DRAFT:0,CHECKING:0,APPROVAL:0,QA:0,RELEASED:0};
+  chartDrawings.forEach(function(d){ if(chartBs[d.CurrentStage]!==undefined) chartBs[d.CurrentStage]++; });
+  var showChart = chartDrawings.length > 0;
   document.getElementById('dashChart').style.display = showChart ? '' : 'none';
   if (showChart) {
+    // Update chart title to be role-aware
+    var chartTitleEl = document.querySelector('#dashChart .card-title');
+    if (chartTitleEl) {
+      chartTitleEl.textContent = ['ADMIN','QA'].indexOf(role) >= 0
+        ? 'Pipeline Distribution'
+        : 'My Drawings — Pipeline Distribution';
+    }
     try {
       if (typeof Chart !== 'undefined') {
         var c = document.getElementById('chartCanvas');
         if (chartInst) { chartInst.destroy(); chartInst = null; }
         var _lb=['Draft','Checking','Approval','QA','Released'];
-        var _vl=[bs.DRAFT,bs.CHECKING,bs.APPROVAL,bs.QA,bs.RELEASED];
+        var _vl=[chartBs.DRAFT,chartBs.CHECKING,chartBs.APPROVAL,chartBs.QA,chartBs.RELEASED];
         var _cl=['#94A3B8','#F59E0B','#3B82F6','#EF4444','#10B981'];
         chartInst = new Chart(c, {
           type:'doughnut',
@@ -1957,8 +1986,19 @@ function renderDashboard() {
     } catch(e){ console.warn('Chart:', e.message); }
   }
 
-  // Recent (latest 6 by submission date)
-  var recent = allDrawings.slice().sort(function(a,b){ return new Date(b.SubmittedOn)-new Date(a.SubmittedOn); }).slice(0,6);
+  // ── Recent drawings (role-scoped, latest 6) ───────────────
+  var recent = myDrawings.slice()
+    .sort(function(a,b){ return new Date(b.SubmittedOn)-new Date(a.SubmittedOn); })
+    .slice(0,6);
+
+  // Update "Recent Drawings" card title for non-admin roles
+  var recentTitleEl = document.querySelector('#dashRecent .card-title');
+  if (recentTitleEl) {
+    recentTitleEl.textContent = ['ADMIN','QA'].indexOf(role) >= 0
+      ? 'Recent Drawings'
+      : 'My Recent Drawings';
+  }
+
   if (recent.length) {
     document.getElementById('dashRecent').style.display = '';
     document.getElementById('dashRecentBody').innerHTML =
