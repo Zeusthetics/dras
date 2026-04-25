@@ -5,283 +5,743 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DRAS — Drawing Release & Approval System</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ── Reset & Variables ─────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --red:#D62828;--ink:#0D0D0D;--bg:#F4F1EB;--card:#fff;
-  --border:#E0DDD5;--text:#1A1A1A;--muted:#888;
-  --green:#1B6B3A;--blue:#2B4590;--amber:#B45309;--purple:#6B2D8B;
-  --rose:#D62828;--rose-lt:#FFE4E6;--emerald:#1B6B3A;--emerald-lt:#D1FAE5;
-  --blue-lt:#DBEAFE;--violet:#6B2D8B;--violet-lt:#EDE9FE;--amber-lt:#FEF3C7;
-  /* Alias vars used by JS-generated HTML */
+  /* Core palette */
   --s950:#020617;--s900:#0F172A;--s800:#1E293B;--s700:#334155;
-  --s600:#475569;--s500:#64748B;--s400:#94A3B8;--s300:#CBD5E1;
-  --s200:#E2E8F0;--s100:#F1F5F9;--s50:#F8FAFC;
-  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
-  --sw:220px;
+  --s950:#020617;--s900:#0F172A;--s800:#1E293B;--s700:#334155;--s600:#475569;
+  --s500:#64748B;--s400:#94A3B8;--s300:#CBD5E1;--s200:#E2E8F0;--s100:#F1F5F9;--s50:#F8FAFC;
+  --amber:#D97706;--amber-lt:#FEF3C7;
+  --emerald:#047857;--emerald-lt:#D1FAE5;
+  --blue:#1D4ED8;--blue-lt:#DBEAFE;
+  --rose:#BE123C;--rose-lt:#FFE4E6;
+  --violet:#6D28D9;--violet-lt:#EDE9FE;
+  /* Semantic */
+  --ink:var(--s900);--bg:var(--s50);--card:#FFFFFF;
+  --border:var(--s200);--text:var(--s900);--muted:var(--s500);
+  --red:var(--rose);--green:var(--emerald);--blue:var(--blue);--amber:var(--amber);
+  /* Typography */
+  --sans:'Plus Jakarta Sans',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+  /* Layout */
+  --sw:256px;
+  /* Motion */
+  --ease-out:cubic-bezier(0.22,1,0.36,1);
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+  --ease-smooth:cubic-bezier(0.4,0,0.2,1);
+  /* Shadows */
+  --shadow-sm:0 1px 3px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
+  --shadow-md:0 4px 16px rgba(15,23,42,.08),0 2px 6px rgba(15,23,42,.05);
+  --shadow-lg:0 16px 48px rgba(15,23,42,.14),0 4px 16px rgba(15,23,42,.08);
+  --shadow-xl:0 32px 80px rgba(15,23,42,.2),0 8px 24px rgba(15,23,42,.1);
 }
-body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+
+/* ── Keyframes ─────────────────────────────────────────── */
+@keyframes _spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(18px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideInLeft{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.93) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes lineGrow{from{width:0}to{width:var(--w,100%)}}
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(217,119,6,.4)}50%{box-shadow:0 0 0 6px rgba(217,119,6,0)}}
+@keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
+
+/* ── Body ──────────────────────────────────────────────── */
+body{
+  font-family:var(--sans);background:var(--bg);color:var(--text);
+  font-size:14px;min-height:100vh;
+  font-weight:400;-webkit-font-smoothing:antialiased;
+  letter-spacing:-0.005em;
+}
 
 /* ── Layout ────────────────────────────────────────────── */
 .app{display:flex;min-height:100vh}
-.sidebar{width:var(--sw);background:var(--ink);flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar{
+  width:var(--sw);flex-shrink:0;
+  background:var(--s900);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  border-right:1px solid rgba(255,255,255,.04);
+}
 .main{flex:1;min-width:0;overflow-x:hidden}
 
 /* ── Sidebar ───────────────────────────────────────────── */
-.logo{padding:18px 16px 14px;border-bottom:1px solid #1d1d1d}
-.logo-plm{font-family:var(--mono);font-size:9px;background:var(--red);color:#fff;padding:2px 6px;letter-spacing:.1em;display:inline-block;margin-bottom:6px}
-.logo-name{font-size:16px;font-weight:700;color:#fff;letter-spacing:-.01em}
-.logo-sub{font-family:var(--mono);font-size:9px;color:#3a3a3a;margin-top:2px;text-transform:uppercase;letter-spacing:.1em}
-.nav{padding:8px 0;flex:1}
-.nav-sep{padding:8px 16px 3px;font-family:var(--mono);font-size:9px;color:#2a2a2a;text-transform:uppercase;letter-spacing:.12em;margin-top:4px}
-.ni{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#777;cursor:pointer;font-size:13px;transition:all .12s;border-left:3px solid transparent;user-select:none}
-.ni:hover{background:#111;color:#ccc}
-.ni.active{background:#111;color:#fff;border-left-color:var(--red)}
-.ni-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
-.ni-badge{margin-left:auto;background:var(--red);color:#fff;font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:2px;min-width:20px;text-align:center}
-.user-panel{padding:12px 16px;border-top:1px solid #1a1a1a}
-.user-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.user-av{width:28px;height:28px;background:#1d1d1d;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#888;flex-shrink:0;border:1px solid #2a2a2a}
-.user-nm{color:#ccc;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
-.user-rl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
-.role-DRAFTER{color:#4A9FD4}.role-CHECKER{color:#F5A623}.role-APPROVER{color:#7ED321}.role-QA{color:#e05050}.role-ADMIN{color:#B07FD4}
-.sw-btn{width:100%;background:transparent;border:1px solid #1d1d1d;color:#444;font-size:10px;font-family:var(--mono);padding:4px 8px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;border-radius:2px;transition:.12s}
-.sw-btn:hover{border-color:#333;color:#666}
+.logo{
+  padding:24px 20px 20px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  position:relative;overflow:hidden;
+}
+.logo::after{
+  content:'';position:absolute;top:-40px;right:-30px;
+  width:140px;height:140px;
+  background:radial-gradient(circle,rgba(217,119,6,.15) 0%,transparent 70%);
+  pointer-events:none;
+}
+.logo-plm{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(217,119,6,.15);
+  border:1px solid rgba(217,119,6,.3);
+  color:#F59E0B;
+  font-family:var(--mono);font-size:8px;
+  padding:3px 8px;letter-spacing:.15em;
+  text-transform:uppercase;border-radius:4px;
+  margin-bottom:10px;
+}
+.logo-name{
+  font-size:24px;font-weight:800;color:#fff;
+  letter-spacing:-.05em;line-height:1;
+}
+.logo-sub{
+  font-family:var(--mono);font-size:9px;
+  color:rgba(255,255,255,.2);
+  margin-top:5px;text-transform:uppercase;letter-spacing:.14em;
+}
+.nav{padding:12px 0;flex:1}
+.nav-sep{
+  padding:14px 20px 5px;
+  font-family:var(--mono);font-size:8px;
+  color:rgba(255,255,255,.15);
+  text-transform:uppercase;letter-spacing:.16em;
+}
+.ni{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 20px;
+  color:rgba(255,255,255,.4);
+  cursor:pointer;font-size:13px;font-weight:500;
+  transition:all .18s var(--ease-out);
+  border-left:2px solid transparent;
+  user-select:none;
+  animation:slideInLeft .3s var(--ease-out) both;
+  position:relative;
+}
+.ni:nth-child(1){animation-delay:.05s}.ni:nth-child(2){animation-delay:.1s}
+.ni:nth-child(3){animation-delay:.15s}.ni:nth-child(4){animation-delay:.2s}
+.ni:nth-child(5){animation-delay:.25s}.ni:nth-child(6){animation-delay:.3s}
+.ni:hover{
+  background:rgba(255,255,255,.05);
+  color:rgba(255,255,255,.8);
+  border-left-color:rgba(255,255,255,.15);
+  padding-left:22px;
+}
+.ni.active{
+  background:rgba(217,119,6,.12);
+  color:#FCD34D;
+  border-left-color:#D97706;
+  padding-left:22px;
+}
+.ni.active::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:2px;height:20px;
+  background:linear-gradient(180deg,#F59E0B,#D97706);
+  border-radius:0 2px 2px 0;
+}
+.ni-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;opacity:.6}
+.ni.active .ni-icon{opacity:1}
+.ni-badge{
+  margin-left:auto;
+  background:#D97706;color:#fff;
+  font-family:var(--mono);font-size:8px;font-weight:500;
+  padding:2px 7px;border-radius:100px;
+  min-width:22px;text-align:center;
+  animation:glow 2s ease-in-out infinite;
+}
+.user-panel{
+  padding:16px 20px;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:rgba(0,0,0,.15);
+}
+.user-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.user-av{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,#D97706,#92400E);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:#fff;flex-shrink:0;
+  font-family:var(--sans);
+  box-shadow:0 2px 8px rgba(217,119,6,.4);
+}
+.user-nm{
+  color:rgba(255,255,255,.85);font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;
+  letter-spacing:-.01em;
+}
+.user-rl{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+.role-DRAFTER{color:#60A5FA}.role-CHECKER{color:#FBBF24}.role-APPROVER{color:#34D399}.role-QA{color:#F87171}.role-ADMIN{color:#C084FC}
+.sw-btn{
+  width:100%;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  color:rgba(255,255,255,.3);
+  font-size:10px;font-family:var(--mono);
+  padding:6px 10px;cursor:pointer;
+  text-transform:uppercase;letter-spacing:.08em;
+  border-radius:6px;transition:all .18s;
+}
+.sw-btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.15)}
 
 /* ── Topbar ────────────────────────────────────────────── */
-.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.page-title{font-size:14px;font-weight:700}
+.topbar{
+  background:rgba(248,250,252,.92);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:0 28px;height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.page-title{font-size:16px;font-weight:700;letter-spacing:-.03em;color:var(--s900)}
 .topbar-r{display:flex;gap:8px;align-items:center}
-#topEmail{font-size:11px;color:var(--muted);font-family:var(--mono)}
+#topEmail{
+  font-size:10px;color:var(--muted);font-family:var(--mono);
+  background:var(--s100);padding:4px 10px;border-radius:100px;
+  border:1px solid var(--border);
+}
 
 /* ── Views ─────────────────────────────────────────────── */
-.view{display:none;padding:20px 24px}.view.active{display:block}
+.view{display:none;padding:24px 28px}
+.view.active{display:block;animation:fadeIn .2s var(--ease-out)}
 
 /* ── Buttons ───────────────────────────────────────────── */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:var(--sans);transition:all .12s;border-radius:2px;white-space:nowrap;line-height:1.2}
-.btn-primary{background:var(--red);color:#fff}.btn-primary:hover{background:#B01F1F}
-.btn-success{background:var(--green);color:#fff}.btn-success:hover{background:#155730}
-.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-outline:hover{border-color:#999;background:#fafaf8}
-.btn-danger{background:#FFF0F0;color:var(--red);border:1px solid #FFD0D0}.btn-danger:hover{background:#FFE0E0}
-.btn-sm{padding:5px 10px;font-size:11px}
-.btn-xs{padding:3px 8px;font-size:10px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 16px;border:none;cursor:pointer;
+  font-size:12px;font-weight:600;font-family:var(--sans);
+  transition:all .16s var(--ease-out);
+  border-radius:8px;white-space:nowrap;line-height:1.2;
+  letter-spacing:-.01em;
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{
+  background:linear-gradient(135deg,#D97706,#B45309);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(217,119,6,.35),0 1px 3px rgba(217,119,6,.2);
+}
+.btn-primary:hover{
+  background:linear-gradient(135deg,#F59E0B,#D97706);
+  box-shadow:0 4px 16px rgba(217,119,6,.45),0 2px 6px rgba(217,119,6,.25);
+  transform:translateY(-1px);
+}
+.btn-primary:active{transform:scale(.97) translateY(0)}
+.btn-success{
+  background:linear-gradient(135deg,#059669,#047857);color:#fff;
+  box-shadow:0 2px 8px rgba(4,120,87,.3);
+}
+.btn-success:hover{background:linear-gradient(135deg,#10B981,#059669);transform:translateY(-1px)}
+.btn-outline{
+  background:transparent;color:var(--s700);
+  border:1px solid var(--border);
+  box-shadow:var(--shadow-sm);
+}
+.btn-outline:hover{border-color:var(--s400);background:var(--s100);color:var(--s900)}
+.btn-danger{
+  background:var(--rose-lt);color:var(--rose);
+  border:1px solid rgba(190,18,60,.15);
+}
+.btn-danger:hover{background:#FECDD3}
+.btn-sm{padding:5px 12px;font-size:11px}
+.btn-xs{padding:3px 8px;font-size:10px;border-radius:6px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 
 /* ── Cards ─────────────────────────────────────────────── */
-.card{background:var(--card);border:1px solid var(--border);margin-bottom:16px;border-radius:2px}
-.card-hd{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px}
-.card-title{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#555}
-.card-body{padding:18px}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  margin-bottom:16px;
+  box-shadow:var(--shadow-sm);
+  transition:box-shadow .2s var(--ease-smooth);
+}
+.card:hover{box-shadow:var(--shadow-md)}
+.card-hd{
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;min-height:48px;
+  border-radius:12px 12px 0 0;
+}
+.card-title{
+  font-size:11px;font-weight:700;font-family:var(--mono);
+  text-transform:uppercase;letter-spacing:.1em;color:var(--s500);
+}
+.card-body{padding:20px}
 
 /* ── Stats ─────────────────────────────────────────────── */
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:18px}
-.stat-card{background:#fff;border:1px solid var(--border);padding:14px 16px;border-radius:2px}
-.stat-num{font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--ink)}
-.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:5px}
-.stat-card.red .stat-num{color:var(--red)}.stat-card.green .stat-num{color:var(--green)}
-.stat-card.blue .stat-num{color:var(--blue)}.stat-card.amber .stat-num{color:var(--amber)}
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px;margin-bottom:20px;
+}
+.stat-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:20px 20px 18px;
+  box-shadow:var(--shadow-sm);
+  transition:all .22s var(--ease-out);
+  animation:fadeUp .35s var(--ease-out) both;
+  position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:'';
+  position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:var(--stat-accent, var(--s200));
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .4s var(--ease-out);
+}
+.stat-card:hover::before{transform:scaleX(1)}
+.stat-card:nth-child(1){animation-delay:.04s}
+.stat-card:nth-child(2){animation-delay:.1s}
+.stat-card:nth-child(3){animation-delay:.16s}
+.stat-card:nth-child(4){animation-delay:.22s}
+.stat-card:nth-child(5){animation-delay:.28s}
+.stat-card:nth-child(6){animation-delay:.34s}
+.stat-card:hover{
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-md);
+}
+.stat-card.red{--stat-accent:var(--rose)}
+.stat-card.green{--stat-accent:var(--emerald)}
+.stat-card.blue{--stat-accent:var(--blue)}
+.stat-card.amber{--stat-accent:var(--amber)}
+.stat-num{
+  font-size:44px;font-weight:800;
+  letter-spacing:-.06em;line-height:1;
+  font-feature-settings:'tnum';
+  color:var(--s900);
+  animation:countUp .45s var(--ease-out) both;
+}
+.stat-card.red .stat-num{color:var(--rose);background:none;-webkit-text-fill-color:currentColor}
+.stat-card.green .stat-num{color:var(--emerald);background:none;-webkit-text-fill-color:currentColor}
+.stat-card.blue .stat-num{color:var(--blue);background:none;-webkit-text-fill-color:currentColor}
+.stat-card.amber .stat-num{color:var(--amber);background:none;-webkit-text-fill-color:currentColor}
+.stat-lbl{
+  font-family:var(--mono);font-size:9px;
+  text-transform:uppercase;letter-spacing:.12em;
+  color:var(--muted);margin-top:8px;
+}
 
 /* ── Tables ────────────────────────────────────────────── */
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:12px}
-th{background:#F8F7F4;color:#555;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;text-align:left;white-space:nowrap;border-bottom:2px solid var(--border)}
-td{padding:8px 12px;border-bottom:1px solid #F0EDE6;vertical-align:middle}
-tr:hover td{background:#FAFAF8}
+th{
+  background:var(--s50);color:var(--s500);
+  font-family:var(--mono);font-size:9px;
+  text-transform:uppercase;letter-spacing:.09em;
+  padding:10px 14px;text-align:left;white-space:nowrap;
+  border-bottom:1px solid var(--border);font-weight:500;
+}
+td{
+  padding:10px 14px;border-bottom:1px solid var(--s100);
+  vertical-align:middle;transition:background .1s;
+}
 tr:last-child td{border-bottom:none}
-.no-data{text-align:center;color:var(--muted);padding:28px!important;font-size:12px}
-.tbl-id{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--ink)}
+tr:hover td{background:var(--s50)}
+.no-data{text-align:center;color:var(--muted);padding:36px!important;font-size:13px}
+.tbl-id{
+  font-family:var(--mono);font-weight:500;font-size:11px;
+  color:var(--s800);
+  background:var(--s100);padding:2px 7px;border-radius:4px;
+  display:inline-block;
+}
 
 /* ── Badges ────────────────────────────────────────────── */
-.badge{display:inline-flex;align-items:center;font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;text-transform:uppercase;letter-spacing:.05em;border-radius:2px;white-space:nowrap}
-.badge-DRAFT{background:#F0EDE6;color:#666}
-.badge-CHECKING{background:#FFF3CD;color:#7A4A00}
-.badge-APPROVAL{background:#E8F0FF;color:var(--blue)}
-.badge-QA{background:#FFE8E8;color:var(--red)}
-.badge-RELEASED{background:#E8F8EE;color:var(--green)}
-.badge-REJECTED{background:#F8E8E8;color:#900}
-.role-badge{font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;border-radius:2px;text-transform:uppercase;letter-spacing:.04em}
-.rb-DRAFTER{background:#E8F4FF;color:#2B6CB0}
-.rb-CHECKER{background:#FFFCE8;color:#7A5200}
-.rb-APPROVER{background:#EFF8E8;color:#2D6016}
-.rb-QA{background:#FFE8E8;color:var(--red)}
-.rb-ADMIN{background:#F3E8FF;color:var(--purple)}
+.badge{
+  display:inline-flex;align-items:center;
+  font-family:var(--mono);font-size:8px;font-weight:500;
+  padding:3px 8px;text-transform:uppercase;letter-spacing:.06em;
+  border-radius:100px;white-space:nowrap;
+}
+.badge-DRAFT{background:var(--s100);color:var(--s600,var(--s500));border:1px solid var(--s200)}
+.badge-CHECKING{background:#FFFBEB;color:#B45309;border:1px solid #FDE68A}
+.badge-APPROVAL{background:var(--blue-lt);color:#1E40AF;border:1px solid #BFDBFE}
+.badge-QA{background:var(--rose-lt);color:#BE123C;border:1px solid #FECDD3}
+.badge-RELEASED{background:var(--emerald-lt);color:#065F46;border:1px solid #A7F3D0}
+.badge-REJECTED{background:#FFF1F2;color:#9F1239;border:1px solid #FECDD3}
+.role-badge{
+  font-family:var(--mono);font-size:8px;font-weight:500;
+  padding:3px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em;
+}
+.rb-DRAFTER{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.rb-CHECKER{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.rb-APPROVER{background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0}
+.rb-QA{background:var(--rose-lt);color:#BE123C;border:1px solid #FECDD3}
+.rb-ADMIN{background:var(--violet-lt);color:#5B21B6;border:1px solid #DDD6FE}
 
 /* ── Forms ─────────────────────────────────────────────── */
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .form-row.full{grid-template-columns:1fr}
-.fg{display:flex;flex-direction:column;gap:5px}
-label,.lbl{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#666}
-input,select,textarea{border:1px solid var(--border);padding:8px 10px;font-size:13px;font-family:var(--sans);background:#fff;width:100%;border-radius:2px;transition:border .12s;color:var(--text)}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
-textarea{resize:vertical;min-height:72px}
-.hint{font-size:10px;color:var(--muted);margin-top:3px}
-.req{color:var(--red)}
+.fg{display:flex;flex-direction:column;gap:6px}
+label,.lbl{
+  font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--s600,var(--s500));
+}
+input,select,textarea{
+  border:1px solid var(--border);
+  padding:9px 12px;font-size:13px;font-family:var(--sans);font-weight:400;
+  background:#fff;width:100%;border-radius:8px;
+  transition:border .15s,box-shadow .15s;
+  color:var(--text);letter-spacing:-.01em;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:#D97706;
+  box-shadow:0 0 0 3px rgba(217,119,6,.12);
+}
+textarea{resize:vertical;min-height:80px}
+.hint{font-size:11px;color:var(--muted);margin-top:3px}
+.req{color:var(--rose)}
 
 /* ── Upload ────────────────────────────────────────────── */
-.upload-zone{border:2px dashed var(--border);padding:22px;text-align:center;cursor:pointer;transition:all .15s;border-radius:3px;background:#FAFAF8}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--red);background:#FFF8F8}
-.upload-icon{font-size:26px;margin-bottom:6px}
-.upload-text{font-size:12px;color:var(--muted)}.upload-text b{color:var(--red)}
-.file-chosen{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#F0F8FF;border:1px solid #C0D8F0;margin-top:8px;font-size:11px;border-radius:2px}
-.progress-wrap{display:none;margin-top:8px}
-.progress-bar-bg{background:#eee;height:5px;border-radius:3px;overflow:hidden}
-.progress-bar{height:5px;background:var(--green);border-radius:3px;transition:width .2s;width:0%}
-.progress-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px}
+.upload-zone{
+  border:2px dashed var(--border);
+  padding:28px;text-align:center;cursor:pointer;
+  transition:all .2s var(--ease-out);
+  border-radius:10px;background:var(--s50);
+}
+.upload-zone:hover,.upload-zone.drag{
+  border-color:#D97706;background:#FFFBEB;
+  transform:scale(1.007);
+  box-shadow:0 0 0 4px rgba(217,119,6,.08);
+}
+.upload-icon{font-size:28px;margin-bottom:8px}
+.upload-text{font-size:12px;color:var(--muted)}.upload-text b{color:#D97706}
+.file-chosen{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 13px;background:var(--emerald-lt);
+  border:1px solid #A7F3D0;margin-top:10px;
+  font-size:11px;border-radius:8px;color:var(--emerald);
+}
+.progress-wrap{display:none;margin-top:10px}
+.progress-bar-bg{background:var(--s200);height:3px;border-radius:4px;overflow:hidden}
+.progress-bar{height:3px;background:linear-gradient(90deg,#D97706,#F59E0B);border-radius:4px;transition:width .2s;width:0%}
+.progress-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px}
 
 /* ── Alerts ────────────────────────────────────────────── */
-.alert{padding:9px 13px;font-size:12px;margin-bottom:12px;border-radius:2px;display:none}
-.alert.show{display:block}
-.ae{background:#FFF0F0;color:var(--red);border-left:3px solid var(--red)}
-.as{background:#EFF8F3;color:var(--green);border-left:3px solid var(--green)}
-.ai{background:#EEF2FF;color:var(--blue);border-left:3px solid var(--blue)}
+.alert{
+  padding:11px 14px;font-size:12px;
+  margin-bottom:14px;border-radius:8px;display:none;
+  font-weight:500;
+}
+.alert.show{display:block;animation:fadeUp .2s var(--ease-out)}
+.ae{background:var(--rose-lt);color:#9F1239;border:1px solid #FECDD3}
+.as{background:var(--emerald-lt);color:#065F46;border:1px solid #A7F3D0}
+.ai{background:var(--blue-lt);color:#1E40AF;border:1px solid #BFDBFE}
 
 /* ── Toast ─────────────────────────────────────────────── */
-.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:10px 16px;font-size:12px;z-index:9999;border-radius:2px;max-width:300px;pointer-events:none;opacity:0;transform:translateY(8px);transition:all .2s}
-.toast.show{opacity:1;transform:translateY(0)}
-.toast.ts{border-left:3px solid var(--green)}.toast.te{border-left:3px solid var(--red)}.toast.ti{border-left:3px solid var(--blue)}
+.toast{
+  position:fixed;bottom:24px;right:24px;
+  background:var(--s900);color:#fff;
+  padding:12px 18px;font-size:13px;font-weight:500;
+  z-index:9999;border-radius:10px;max-width:340px;
+  pointer-events:none;
+  opacity:0;transform:translateY(14px) scale(.96);
+  transition:all .24s var(--ease-spring);
+  box-shadow:var(--shadow-xl);
+  letter-spacing:-.01em;
+}
+.toast.show{opacity:1;transform:translateY(0) scale(1)}
+.toast.ts{border-left:3px solid #10B981}
+.toast.te{border-left:3px solid var(--rose)}
+.toast.ti{border-left:3px solid #3B82F6}
 
 /* ── Spinner ───────────────────────────────────────────── */
-.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:_spin .6s linear infinite;vertical-align:middle}
-@keyframes _spin{to{transform:rotate(360deg)}}
+.spin{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(255,255,255,.25);
+  border-top-color:#fff;border-radius:50%;
+  animation:_spin .5s linear infinite;vertical-align:middle;
+}
 
 /* ── Loading Overlay ───────────────────────────────────── */
-.loading-ov{display:none;position:fixed;inset:0;background:rgba(244,241,235,.88);z-index:2000;align-items:center;justify-content:center;flex-direction:column;gap:10px}
-.loading-ov.show{display:flex}
-.loading-txt{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.loading-ov{
+  display:none;position:fixed;inset:0;
+  background:rgba(248,250,252,.92);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  z-index:2000;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;
+}
+.loading-ov.show{display:flex;animation:fadeIn .15s}
+.loading-txt{
+  font-family:var(--mono);font-size:11px;
+  color:var(--muted);letter-spacing:.06em;
+  text-transform:uppercase;
+}
+/* Animated loading bar */
+.loading-ov .load-bar{
+  width:140px;height:2px;background:var(--s200);
+  border-radius:4px;overflow:hidden;margin-top:4px;
+}
+.loading-ov .load-fill{
+  height:100%;width:40%;
+  background:linear-gradient(90deg,#D97706,#F59E0B);
+  border-radius:4px;
+  animation:shimmer 1.2s ease-in-out infinite;
+  background-size:200% 100%;
+}
 
 /* ── Modal ─────────────────────────────────────────────── */
-.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:16px}
-.modal-ov.open{display:flex}
-.modal{background:#fff;width:660px;max-width:100%;max-height:90vh;overflow:hidden;border-radius:2px;box-shadow:0 24px 80px rgba(0,0,0,.25);display:flex;flex-direction:column}
-.modal-sm{width:420px}
-.modal-hd{padding:13px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
-.modal-title{font-size:12px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em}
-.modal-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);line-height:1;padding:2px 6px}
-.modal-x:hover{color:var(--text)}
-.modal-body{padding:18px;overflow-y:auto;flex:1}
-.modal-ft{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+.modal-ov{
+  display:none;position:fixed;inset:0;
+  background:rgba(15,23,42,.65);
+  z-index:1000;align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.modal-ov.open{display:flex;animation:fadeIn .15s}
+.modal{
+  background:#fff;width:700px;max-width:100%;max-height:90vh;
+  overflow:hidden;border-radius:16px;
+  box-shadow:var(--shadow-xl);
+  display:flex;flex-direction:column;
+  animation:popIn .26s var(--ease-spring);
+}
+.modal-sm{width:460px}
+.modal-hd{
+  padding:16px 24px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+  background:var(--s50);border-radius:16px 16px 0 0;
+}
+.modal-title{font-size:13px;font-weight:700;letter-spacing:-.02em;color:var(--s900)}
+.modal-x{
+  background:var(--s200);border:none;
+  width:26px;height:26px;border-radius:50%;
+  cursor:pointer;color:var(--s600,var(--s500));
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;line-height:1;transition:.15s;
+}
+.modal-x:hover{background:var(--s300,var(--s200));color:var(--s900)}
+.modal-body{padding:24px;overflow-y:auto;flex:1}
+.modal-ft{
+  padding:16px 24px;border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;
+  background:var(--s50);
+}
 
 /* ── Pipeline ──────────────────────────────────────────── */
-.pipeline{display:flex;overflow-x:auto;padding:2px 0;margin-bottom:14px;gap:0}
-.ps{flex:1;min-width:72px;text-align:center;padding:8px 4px;background:#F5F5F0;border:1px solid var(--border);position:relative;margin-right:14px;font-size:10px;transition:.12s}
+.pipeline{display:flex;overflow-x:auto;padding:4px 0;margin-bottom:16px;gap:0}
+.ps{
+  flex:1;min-width:80px;text-align:center;
+  padding:10px 6px;
+  background:var(--s50);border:1px solid var(--border);
+  position:relative;margin-right:20px;font-size:10px;
+  transition:all .18s;border-radius:8px;
+}
 .ps:last-child{margin-right:0}
-.ps.active{background:var(--ink);color:#fff;border-color:var(--ink)}
-.ps.done{background:#E8F8EE;border-color:#9DCCB0;color:var(--green)}
-.ps::after{content:'→';position:absolute;right:-12px;top:50%;transform:translateY(-50%);font-size:11px;color:#bbb;z-index:1;background:transparent;width:12px;text-align:center}
+.ps.active{
+  background:linear-gradient(135deg,var(--s900),var(--s800));
+  color:#fff;border-color:var(--s800);
+  box-shadow:var(--shadow-md);
+}
+.ps.done{background:var(--emerald-lt);border-color:#A7F3D0;color:var(--emerald)}
+.ps::after{
+  content:'›';position:absolute;right:-16px;top:50%;transform:translateY(-50%);
+  font-size:16px;color:var(--s300,var(--s400));z-index:1;
+  background:transparent;width:16px;text-align:center;
+}
 .ps:last-child::after{display:none}
-.ps-n{font-family:var(--mono);font-size:8px;opacity:.5;margin-bottom:2px}
+.ps-n{font-family:var(--mono);font-size:8px;opacity:.45;margin-bottom:2px}
 .ps-l{font-weight:700;font-size:10px}
 
 /* ── Timeline ──────────────────────────────────────────── */
 .timeline{padding:2px 0}
-.tl-item{display:flex;gap:10px;padding-bottom:14px;position:relative}
-.tl-item::before{content:'';position:absolute;left:13px;top:26px;bottom:0;width:2px;background:var(--border)}
+.tl-item{
+  display:flex;gap:12px;padding-bottom:16px;position:relative;
+  animation:slideInLeft .25s var(--ease-out) both;
+}
+.tl-item:nth-child(1){animation-delay:.03s}.tl-item:nth-child(2){animation-delay:.07s}
+.tl-item:nth-child(3){animation-delay:.11s}.tl-item:nth-child(4){animation-delay:.15s}
+.tl-item::before{
+  content:'';position:absolute;left:13px;top:28px;bottom:0;
+  width:1px;background:var(--s200);
+}
 .tl-item:last-child::before{display:none}
-.tl-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;z-index:1}
-.dot-ok{background:#E8F8EE;border:2px solid var(--green)}
-.dot-no{background:#FFF0F0;border:2px solid var(--red)}
-.dot-pend{background:#F5F5F5;border:2px dashed #CCC}
-.tl-body{flex:1;padding-top:3px}
-.tl-act{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase}
-.tl-meta{font-size:10px;color:var(--muted);margin-top:1px}
-.tl-rem{font-size:11px;color:#555;margin-top:4px;padding:5px 9px;background:#FFF8F0;border-left:2px solid var(--amber);border-radius:1px}
+.tl-dot{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;flex-shrink:0;z-index:1;
+}
+.dot-ok{background:var(--emerald-lt);border:2px solid #6EE7B7}
+.dot-no{background:var(--rose-lt);border:2px solid #FDA4AF}
+.dot-pend{background:var(--s100);border:2px dashed var(--s300,var(--s200))}
+.tl-body{flex:1;padding-top:4px}
+.tl-act{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+.tl-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.tl-rem{
+  font-size:12px;color:var(--s700);margin-top:6px;
+  padding:8px 12px;background:#FFFBEB;
+  border-left:2px solid #D97706;border-radius:0 6px 6px 0;
+}
 
 /* ── Info Grid ─────────────────────────────────────────── */
-.info-grid{display:grid;grid-template-columns:110px 1fr 110px 1fr;font-size:12px;border:1px solid var(--border);border-radius:2px;overflow:hidden;margin-bottom:14px}
-.ig-lbl{background:#F8F7F4;color:var(--muted);padding:6px 10px;font-size:10px;font-weight:600;font-family:var(--mono);border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
-.ig-val{padding:6px 10px;border-bottom:1px solid var(--border);word-break:break-word}
+.info-grid{
+  display:grid;grid-template-columns:120px 1fr 120px 1fr;
+  font-size:12px;border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;margin-bottom:16px;
+}
+.ig-lbl{
+  background:var(--s50);color:var(--muted);
+  padding:8px 12px;font-size:10px;font-weight:600;font-family:var(--mono);
+  border-bottom:1px solid var(--border);border-right:1px solid var(--border);
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.ig-val{padding:8px 12px;border-bottom:1px solid var(--border);word-break:break-word;font-weight:500}
 .ig-lbl:nth-last-child(-n+2),.ig-val:nth-last-child(-n+2){border-bottom:none}
 .ig-full{grid-column:2/5}
 .ig-lbl-wide{grid-column:1/2}.ig-full-row{display:contents}
 
 /* ── Filter Bar ────────────────────────────────────────── */
-.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.filter-bar input{max-width:220px}
-.filter-bar select{max-width:160px}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-bar input{max-width:240px}
+.filter-bar select{max-width:170px}
 
 /* ── Empty State ───────────────────────────────────────── */
-.empty-st{text-align:center;padding:40px 20px;background:#FAFAF8;border:1px solid var(--border);border-radius:2px}
-.es-icon{font-size:36px;margin-bottom:10px}
-.es-title{font-size:14px;font-weight:700;margin-bottom:6px}
-.es-sub{font-size:12px;color:var(--muted)}
+.empty-st{
+  text-align:center;padding:52px 24px;
+  background:var(--s50);border:1px dashed var(--border);
+  border-radius:12px;animation:fadeUp .3s var(--ease-out);
+}
+.es-icon{font-size:42px;margin-bottom:14px}
+.es-title{font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:-.03em}
+.es-sub{font-size:13px;color:var(--muted);line-height:1.6}
 
 /* ── Email Prompt ──────────────────────────────────────── */
-#ep{display:none;position:fixed;inset:0;background:rgba(13,13,13,.92);z-index:3000;align-items:center;justify-content:center}
-.ep-card{background:var(--bg);width:390px;max-width:94vw;border-radius:2px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.4)}
-.ep-head{background:var(--ink);padding:20px 24px;border-left:4px solid var(--red)}
-.ep-body{padding:22px 24px}
+#ep{
+  display:none;position:fixed;inset:0;
+  background:rgba(2,6,23,.85);
+  z-index:3000;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.ep-card{
+  background:#fff;width:420px;max-width:94vw;
+  border-radius:16px;overflow:hidden;
+  box-shadow:var(--shadow-xl);
+  animation:popIn .3s var(--ease-spring);
+}
+.ep-head{
+  padding:32px 32px 28px;
+  background:linear-gradient(135deg,var(--s900) 0%,var(--s800) 100%);
+  position:relative;overflow:hidden;
+}
+.ep-head::before{
+  content:'';position:absolute;top:-60px;right:-40px;
+  width:180px;height:180px;
+  background:radial-gradient(circle,rgba(217,119,6,.2) 0%,transparent 65%);
+}
+.ep-head::after{
+  content:'';position:absolute;bottom:-20px;left:20px;
+  width:80px;height:80px;
+  background:radial-gradient(circle,rgba(59,130,246,.1) 0%,transparent 65%);
+}
+.ep-body{padding:28px 32px}
+
+/* ── Chart Container ───────────────────────────────────── */
+.chart-container{
+  position:relative;
+  padding:20px;
+  background:linear-gradient(135deg,var(--s50) 0%,#fff 100%);
+}
+.chart-container canvas{max-height:280px}
+
+/* ── Stat trend sparkline ──────────────────────────────── */
+.stat-trend{
+  display:flex;align-items:center;gap:4px;
+  margin-top:6px;font-size:10px;font-weight:600;font-family:var(--mono);
+}
+.trend-up{color:var(--emerald)}.trend-dn{color:var(--rose)}.trend-flat{color:var(--muted)}
 
 /* ── Responsive ────────────────────────────────────────── */
-/* ── Mobile portrait ──────────────────────────────────────── */
 @media(max-width:680px){
-  /* Collapse sidebar to bottom nav */
+  /* ── Bottom tab-bar nav ── */
   :root{--sw:0px}
   .app{flex-direction:column}
   .sidebar{
-    width:100%;height:auto;
+    width:100%;height:56px;
     position:fixed;bottom:0;left:0;right:0;top:auto;
-    flex-direction:row;z-index:200;
+    flex-direction:row;z-index:300;
     border-right:none;border-top:1px solid rgba(255,255,255,.08);
+    overflow:visible;
   }
   .logo,.nav-sep,.user-panel{display:none}
   .nav{
-    display:flex;flex-direction:row;
-    width:100%;padding:0;
-    overflow-x:auto;
+    display:flex;flex-direction:row;align-items:stretch;
+    width:100%;padding:0;flex:1;overflow-x:auto;
   }
   .ni{
-    flex:1;flex-direction:column;gap:3px;
-    padding:8px 4px 6px;justify-content:center;align-items:center;
-    font-size:9px;min-width:52px;border-left:none;border-top:2px solid transparent;
+    flex:1;flex-direction:column;gap:2px;
+    padding:6px 2px 4px;
+    justify-content:center;align-items:center;
+    font-size:9px;min-width:0;
+    border-left:none;border-top:2px solid transparent;
+    animation:none;
   }
-  .ni:hover{padding-left:4px}
-  .ni.active{border-left:none;border-top:2px solid #D97706;padding-left:4px}
+  .ni:hover{padding-left:2px;background:rgba(255,255,255,.05)}
+  .ni.active{
+    border-left:none;border-top:2px solid #D97706;
+    padding-left:2px;
+    background:rgba(217,119,6,.1);
+  }
   .ni.active::before{display:none}
-  .ni-icon{font-size:18px;width:auto}
+  .ni-icon{font-size:20px;width:auto;opacity:.8}
+  .ni.active .ni-icon{opacity:1}
   .ni-badge{
-    position:absolute;top:4px;right:8px;
+    position:absolute;top:3px;right:4px;
     font-size:7px;padding:1px 4px;min-width:14px;
+    animation:none;
   }
   .ni{position:relative}
-  /* Main content — add bottom padding so content isn't behind nav */
-  .main{padding-bottom:64px}
+  /* ── Main content ── */
+  .main{padding-bottom:66px}
   .view{padding:12px 14px}
   .topbar{padding:0 14px;height:46px}
-  .page-title{font-size:13px}
-  /* Stats */
+  .page-title{font-size:14px}
+  #topEmail{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ── Stats ── */
   .stats-row{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-  .stat-card{padding:10px 12px}
-  .stat-num{font-size:22px}
-  /* Forms */
-  .form-row{grid-template-columns:1fr}
-  .form-row.full{grid-template-columns:1fr}
-  /* Info grid */
-  .info-grid{grid-template-columns:90px 1fr;font-size:11px}
-  .ig-full{grid-column:2/3}
-  /* Table — horizontal scroll */
+  .stat-card{padding:12px 14px}
+  .stat-num{font-size:32px}
+  /* ── Chart ── */
+  #dashChart .card-hd{padding:10px 14px}
+  #dashChart > div:not(.card-hd){flex-direction:column;align-items:center;gap:12px;padding:14px}
+  #chartLegend{grid-template-columns:1fr 1fr;width:100%}
+  /* ── Tables ── */
   .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{min-width:520px}
-  /* Cards */
-  .card-hd{padding:10px 14px;flex-wrap:wrap;gap:6px}
+  table{min-width:480px}
+  th,td{padding:8px 10px}
+  /* ── Forms ── */
+  .form-row,.form-row.full{grid-template-columns:1fr}
+  /* ── Cards ── */
+  .card-hd{padding:10px 14px;flex-wrap:wrap;gap:6px;min-height:40px}
   .card-body{padding:14px}
-  /* Modal — full screen on mobile */
+  /* ── Info grid ── */
+  .info-grid{grid-template-columns:80px 1fr;font-size:11px}
+  .ig-full{grid-column:2/3}
+  .ig-lbl,.ig-val{padding:6px 8px}
+  /* ── Modals ── */
   .modal-ov{padding:0;align-items:flex-end}
-  .modal{width:100%;max-width:100%;max-height:92vh;border-radius:12px 12px 0 0}
+  .modal{
+    width:100%;max-width:100%;
+    max-height:88vh;
+    border-radius:14px 14px 0 0;
+  }
   .modal-sm{width:100%;max-width:100%}
-  /* Filter bar */
-  .filter-bar{gap:6px}
-  .filter-bar input{min-width:0;flex:1}
-  .filter-bar select{max-width:120px;font-size:11px}
-  /* Buttons */
-  .btn-sm{padding:4px 10px;font-size:10px}
-  /* Pipeline */
-  .pipeline{gap:0}
-  .ps{min-width:56px;padding:7px 3px;font-size:9px;margin-right:14px}
-  /* EP card */
-  .ep-card{border-radius:12px 12px 0 0;position:fixed;bottom:0;left:0;right:0;width:100%;max-width:100%}
+  /* ── Auth card ── */
+  .ep-card{
+    position:fixed;bottom:0;left:0;right:0;
+    width:100%;max-width:100%;
+    border-radius:14px 14px 0 0;
+  }
   #ep{align-items:flex-end}
+  .ep-head{padding:20px 24px 16px}
+  .ep-body{padding:20px 24px}
+  /* ── Filter bar ── */
+  .filter-bar{gap:6px}
+  .filter-bar input{min-width:0;flex:1;max-width:none}
+  .filter-bar select{max-width:110px;font-size:11px}
+  /* ── Pipeline ── */
+  .ps{min-width:52px;padding:7px 3px;font-size:9px;margin-right:12px}
+  /* ── Buttons ── */
+  .btn-sm{padding:4px 10px;font-size:10px}
 }
 </style>
 </head>
@@ -289,33 +749,114 @@ textarea{resize:vertical;min-height:72px}
 
 <!-- Loading Overlay -->
 <div id="loadingOv" class="loading-ov">
-  <div style="font-size:28px">📐</div>
+  <div style="font-size:32px;font-weight:800;color:var(--s900);letter-spacing:-.05em;opacity:.12;font-family:var(--sans)">DRAS</div>
+  <div style="width:36px;height:36px;border:2px solid var(--s200);border-top-color:#D97706;border-radius:50%;animation:_spin .6s linear infinite"></div>
   <div class="loading-txt" id="loadingTxt">Loading…</div>
+  <div class="load-bar"><div class="load-fill"></div></div>
 </div>
 
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
-<!-- Email Prompt -->
+<!-- Auth Prompt (PIN-based) -->
 <div id="ep">
   <div class="ep-card">
     <div class="ep-head">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-        <span style="font-size:18px;font-weight:700;color:#fff">DRAS</span>
-        <span style="font-family:var(--mono);font-size:9px;background:var(--red);color:#fff;padding:2px 6px;letter-spacing:.1em">PLM</span>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <span style="font-size:36px;font-weight:800;color:#fff;letter-spacing:-.06em;line-height:1;position:relative;z-index:1">DRAS</span>
+        <span style="font-family:var(--mono);font-size:8px;background:rgba(217,119,6,.2);border:1px solid rgba(217,119,6,.4);color:#F59E0B;padding:4px 9px;letter-spacing:.15em;text-transform:uppercase;border-radius:4px;position:relative;z-index:1">PLM</span>
       </div>
-      <div style="color:#888;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em">Drawing Release &amp; Approval System</div>
-      <div style="color:#3a3a3a;font-size:10px;margin-top:1px">Safex Fire Services Ltd.</div>
+      <div style="color:rgba(255,255,255,.4);font-size:9px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;position:relative;z-index:1">Drawing Release &amp; Approval System</div>
+      <div style="color:rgba(255,255,255,.25);font-size:11px;margin-top:4px;font-weight:300;position:relative;z-index:1">Safex Fire Services Ltd.</div>
     </div>
     <div class="ep-body">
-      <p style="font-size:12px;color:#666;margin-bottom:16px">Enter your registered email to sign in and access your drawings.</p>
-      <div class="fg" style="margin-bottom:6px">
-        <label>Your Email</label>
-        <input id="epEmail" type="email" placeholder="you@safexfire.com" onkeydown="if(event.key==='Enter')signIn()">
+
+      <!-- Step 1: Email -->
+      <div id="auth-step-email">
+        <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:20px;font-weight:400;line-height:1.6">Enter your @safexfire.com email to sign in.</p>
+        <div class="fg" style="margin-bottom:6px">
+          <label>Your Email</label>
+          <input id="epEmail" type="email" placeholder="you@safexfire.com" onkeydown="if(event.key==='Enter')authStepEmail()">
+        </div>
+        <div id="epErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="authStepEmail()" id="signInBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Continue →</button>
+        <p style="font-size:10px;color:#999;margin-top:10px;text-align:center">Only @safexfire.com accounts are permitted.</p>
       </div>
-      <div id="epErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
-      <button onclick="signIn()" id="signInBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Continue →</button>
-      <p style="font-size:10px;color:#999;margin-top:10px;text-align:center">Email is used only to load your role and drawings.</p>
+
+      <!-- Step 2a: Verify PIN -->
+      <div id="auth-step-pin" style="display:none">
+        <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:6px;font-weight:400;line-height:1.6">Welcome back, <b id="auth-pin-name"></b>.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Enter your 4-digit PIN to continue.</p>
+        <div class="fg" style="margin-bottom:6px">
+          <label>4-Digit PIN</label>
+          <input id="epPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="current-password"
+            style="font-size:24px;letter-spacing:.4em;text-align:center;padding:10px"
+            onkeydown="if(event.key==='Enter')authVerifyPin()" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+        <div id="pinErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="authVerifyPin()" id="verifyPinBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Sign In →</button>
+        <button onclick="authReset()" style="margin-top:8px;width:100%;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer">← Use a different email</button>
+      </div>
+
+      <!-- Step 2b: Set PIN (first time) -->
+      <div id="auth-step-setpin" style="display:none">
+        <p style="font-size:13px;color:var(--s600,var(--s500));margin-bottom:6px;font-weight:400;line-height:1.6">Hi <b id="auth-setpin-name"></b>, set your PIN.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Create a 4-digit PIN — you'll use this every time you sign in.</p>
+        <div class="fg" style="margin-bottom:10px">
+          <label>New PIN</label>
+          <input id="epNewPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password"
+            style="font-size:24px;letter-spacing:.4em;text-align:center;padding:10px"
+            oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+        <div class="fg" style="margin-bottom:6px">
+          <label>Confirm PIN</label>
+          <input id="epConfPin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password"
+            style="font-size:24px;letter-spacing:.4em;text-align:center;padding:10px"
+            onkeydown="if(event.key==='Enter')authSetPin()" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+        <div id="setPinErr" style="color:var(--red);font-size:11px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="authSetPin()" id="setPinBtn" class="btn btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Set PIN & Sign In →</button>
+        <button onclick="authReset()" style="margin-top:8px;width:100%;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer">← Use a different email</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Change PIN Modal -->
+<div class="modal-ov" id="changePinModal">
+  <div class="modal modal-sm">
+    <div class="modal-hd">
+      <div class="modal-title">Change PIN</div>
+      <button class="modal-x" onclick="closeChangePinModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="changePinAlert" class="alert"></div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Current PIN</label>
+          <input type="password" id="cpOldPin" inputmode="numeric" maxlength="4" placeholder="Current 4-digit PIN"
+            style="font-size:20px;letter-spacing:.3em;text-align:center" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>New PIN</label>
+          <input type="password" id="cpNewPin" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN"
+            style="font-size:20px;letter-spacing:.3em;text-align:center" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="fg">
+          <label>Confirm New PIN</label>
+          <input type="password" id="cpConfPin" inputmode="numeric" maxlength="4" placeholder="Confirm new PIN"
+            style="font-size:20px;letter-spacing:.3em;text-align:center" oninput="this.value=this.value.replace(/\D/g,'')">
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline" onclick="closeChangePinModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="doChangePin()" id="changePinBtn">Update PIN</button>
     </div>
   </div>
 </div>
@@ -326,8 +867,16 @@ textarea{resize:vertical;min-height:72px}
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="logo">
-      <div class="logo-plm">PLM</div>
-      <div class="logo-name">DRAS</div>
+      <img
+        src="https://drive.google.com/thumbnail?id=1RPDltnCRmnzYCQuYg9PIgM0fVhBNikmR&sz=w400"
+        alt="Safex Fire Services"
+        onerror="this.style.display='none';document.getElementById('logoFallback').style.display='block'"
+        style="width:100%;max-width:168px;height:auto;display:block;margin-bottom:10px"
+      >
+      <div id="logoFallback" style="display:none">
+        <div class="logo-plm">PLM</div>
+        <div class="logo-name">DRAS</div>
+      </div>
       <div class="logo-sub">Drawing Release System</div>
     </div>
     <nav class="nav">
@@ -360,7 +909,10 @@ textarea{resize:vertical;min-height:72px}
           <div class="user-rl" id="uRole">—</div>
         </div>
       </div>
-      <button onclick="switchAccount()" class="sw-btn">⇄ Switch Account</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="switchAccount()" class="sw-btn" style="flex:1">⇄ Switch</button>
+        <button onclick="openChangePinModal()" class="sw-btn" style="flex:1" title="Change PIN">🔑 PIN</button>
+      </div>
     </div>
   </aside>
 
@@ -381,9 +933,9 @@ textarea{resize:vertical;min-height:72px}
       </div>
       <div id="dashChart" class="card" style="display:none">
         <div class="card-hd"><div class="card-title">Pipeline Distribution</div></div>
-        <div style="display:flex;align-items:center;padding:14px 18px;gap:20px">
-          <div style="width:110px;height:110px;flex-shrink:0"><canvas id="chartCanvas"></canvas></div>
-          <div id="chartLegend" style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:7px 18px"></div>
+        <div style="display:flex;align-items:center;padding:16px 20px;gap:24px">
+          <div style="width:120px;height:120px;flex-shrink:0"><canvas id="chartCanvas"></canvas></div>
+          <div id="chartLegend" style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px 20px"></div>
         </div>
       </div>
       <div id="dashRecent" style="display:none">
@@ -566,6 +1118,34 @@ textarea{resize:vertical;min-height:72px}
           <button class="btn btn-primary" onclick="saveSettings()" id="saveSettingsBtn">Save Settings</button>
         </div>
       </div>
+
+      <!-- Reminder Settings -->
+      <div class="card" style="max-width:500px;margin-top:16px">
+        <div class="card-hd"><div class="card-title">Reminder Notifications</div></div>
+        <div class="card-body">
+          <div id="reminderAlert" class="alert"></div>
+          <div class="form-row full">
+            <div class="fg">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500">
+                <input type="checkbox" id="cfg-reminder-enabled" style="width:16px;height:16px;border-radius:4px;cursor:pointer">
+                Enable daily pending-drawing reminder emails
+              </label>
+              <div class="hint">Sends a digest email to checkers/approvers for drawings waiting more than the threshold.</div>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg">
+              <label>Reminder Threshold (days)</label>
+              <input type="number" id="cfg-reminder-days" min="1" max="30" placeholder="2" style="max-width:120px">
+              <div class="hint">Send reminders when a drawing has been pending for this many days (default: 2).</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary" onclick="saveReminderConfig()" id="saveReminderBtn">Save Reminder Settings</button>
+            <button class="btn btn-outline btn-sm" onclick="runReminderNow()" id="runReminderBtn">▶ Run Now (Test)</button>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /main -->
@@ -671,16 +1251,96 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// ── API config ───────────────────────────────────────────────
+// Paste your Apps Script /exec URL here. No proxy needed.
+// Content-Type: text/plain bypasses CORS — fetch() works directly
+// from GitHub Pages, local file, anywhere.
+// If the URL ever changes, update this one line and push.
+var API_URL = 'https://script.google.com/macros/s/AKfycbwqoUI-3FrhQuRUA92jke6gqG6bIB_Tmp3CI9ZaK-nDUF7b8cH4NvZ_84spTZanaWVg/exec';
+// ↑ PASTE YOUR APPS SCRIPT /exec URL HERE — this is the only thing you need to set
+// e.g. 'https://script.google.com/macros/s/AKfycbx_LONG_ID_HERE/exec'
+//
+// HOW TO GET IT:
+// Apps Script editor → Deploy → Manage deployments → copy the Web App URL
+//
+// CHECKLIST if you get "Failed to fetch":
+//   1. API_URL set to your actual /exec URL (not the placeholder above)
+//   2. Apps Script deployed with access: "Anyone"  (not "Only myself")
+//   3. Apps Script deployed with execute as: "Me" (USER_DEPLOYING)
+//   4. You authorised the script when prompted on first deployment
+
+// Maps serverFunctionName → { action, payload builder }
+var ACTION_MAP = {
+  serverGetContext:        function(a){ return { action:'getContext',      email:a[0] }; },
+  serverGetAllDrawings:    function(a){ return { action:'getDrawings',     email:a[0] }; },
+  serverGetDrawings:       function(a){ return { action:'getDrawings',     email:a[0] }; },
+  serverGetAuditLog:       function(a){ return { action:'getAuditLog',     drawingId:a[0] }; },
+  serverGetDebugInfo:      function(a){ return { action:'getDebugInfo',    email:a[0] }; },
+  serverInspectSheet:      function(a){ return { action:'getDebugInfo',    email:'' }; },
+  serverSubmitDrawing:     function(a){ return Object.assign({ action:'submitDrawing', email:a[0] }, a[1]); },
+  serverCheckerApprove:    function(a){ return { action:'checkerApprove',  email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverApproverApprove:   function(a){ return { action:'approverApprove', email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverQaRelease:         function(a){ return { action:'qaRelease',       email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverRejectDrawing:     function(a){ return { action:'rejectDrawing',   email:a[0], drawingId:a[1], remarks:a[2] }; },
+  serverResubmitDrawing:   function(a){ return { action:'resubmitDrawing', email:a[0], drawingId:a[1], newFileId:a[2], remarks:a[3] }; },
+  serverUploadFile:        function(a){ return { action:'uploadFile',      base64Data:a[0], fileName:a[1], drawingId:a[2] }; },
+  serverUploadStart:       function(a){ return { action:'uploadStart',     fileName:a[0], drawingId:a[1], totalChunks:a[2] }; },
+  serverUploadChunk:       function(a){ return { action:'uploadChunk',     uploadId:a[0], index:a[1], data:a[2] }; },
+  serverUploadFinish:      function(a){ return { action:'uploadFinish',    uploadId:a[0] }; },
+  serverGetUsers:          function(a){ return { action:'getUsers',        email:a[0] }; },
+  serverAddUser:           function(a){ return { action:'addUser',         email:a[0], targetEmail:a[1], name:a[2], role:a[3] }; },
+  serverUpdateUser:        function(a){ return { action:'updateUser',      email:a[0], targetEmail:a[1], name:a[2], role:a[3] }; },
+  serverDeleteUser:        function(a){ return { action:'deleteUser',      email:a[0], targetEmail:a[1] }; },
+  serverGetConfig:         function(a){ return { action:'getConfig',       email:a[0] }; },
+  serverSaveConfig:        function(a){ return { action:'saveConfig',      email:a[0], key:a[1], value:a[2] }; },
+  serverGetReminderConfig: function(a){ return { action:'getReminderConfig', email:a[0] }; },
+  serverSaveReminderConfig:function(a){ return { action:'saveReminderConfig', email:a[0], enabled:a[1], thresholdDays:a[2] }; },
+  serverRunReminderCheck:  function(a){ return { action:'runReminderCheck',email:a[0] }; },
+  // PIN auth
+  serverCheckEmail:        function(a){ return { action:'checkEmail',      targetEmail:a[0] }; },
+  serverVerifyPin:         function(a){ return { action:'verifyPin',       targetEmail:a[0], pin:a[1] }; },
+  serverSetPin:            function(a){ return { action:'setPin',          targetEmail:a[0], pin:a[1] }; },
+  serverValidateToken:     function(a){ return { action:'validateToken',   token:a[0] }; },
+  serverSignOut:           function(a){ return { action:'signOut',         token:a[0] }; },
+  serverAdminResetPin:     function(a){ return { action:'adminResetPin',   email:a[0], targetEmail:a[1] }; },
+  serverChangePin:         function(a){ return { action:'changePin',       targetEmail:a[0], oldPin:a[1], newPin:a[2] }; }
+};
+
 function gs(fn, args) {
   return new Promise(function(res, rej) {
-    if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      rej(new Error('Not served by Apps Script. Open the deployment URL, not the local file.'));
-      return;
-    }
-    var r = google.script.run
-      .withSuccessHandler(res)
-      .withFailureHandler(function(e){ rej(new Error(e.message || String(e))); });
-    r[fn].apply(r, args || []);
+    var mapper = ACTION_MAP[fn];
+    if (!mapper) { rej(new Error('Unknown function: ' + fn)); return; }
+    var payload = mapper(args || []);
+
+    // Apps Script cross-origin fetch:
+    // - Content-Type: text/plain avoids CORS preflight
+    // - redirect: 'follow' handles the Apps Script 302 redirect
+    // - No-cache header prevents stale responses
+    fetch(API_URL, {
+      method:   'POST',
+      redirect: 'follow',
+      headers:  {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) {
+      if (!r.ok && r.status !== 200) {
+        throw new Error('HTTP ' + r.status + ' — check API_URL is correct and Apps Script is deployed as "Anyone"');
+      }
+      return r.text();
+    })
+    .then(function(txt) {
+      var r;
+      try { r = JSON.parse(txt); }
+      catch(e) { throw new Error('Bad response from server. Raw: ' + txt.slice(0, 120)); }
+      if (r && r.ok) { res(r.data); }
+      else { rej(new Error(r.error || 'Server returned error')); }
+    })
+    .catch(function(e) {
+      // Distinguish network error from server error for easier debugging
+      rej(new Error(e.message.includes('fetch') ? 'Cannot reach server. Check API_URL in index.html.' : e.message));
+    });
   });
 }
 
@@ -720,43 +1380,250 @@ function toast(msg, type) {
 }
 
 // ═══════════════════════════════════════════════
-// AUTH
+// AUTH — PIN-based
 // ═══════════════════════════════════════════════
+var _authEmail = '';
+var _authToken = '';
+
 window.addEventListener('load', function() {
-  // HTML served from GitHub Pages — no Apps Script check needed
-  var saved = '';
-  try { saved = localStorage.getItem('dras_email') || ''; } catch(e){}
-  if (saved) document.getElementById('epEmail').value = saved;
-  document.getElementById('ep').style.display = 'flex';
+  if (API_URL.indexOf('YOUR_APPS_SCRIPT') >= 0) {
+    document.getElementById('epErr').innerHTML =
+      '<b style="color:#D62828">⚠ API_URL not set.</b><br>' +
+      'Open <code style="background:#eee;padding:1px 4px">index.html</code>, find ' +
+      '<code style="background:#eee;padding:1px 4px">var API_URL</code> and paste your ' +
+      'Apps Script <code style="background:#eee;padding:1px 4px">/exec</code> URL.';
+    document.getElementById('signInBtn').disabled = true;
+  }
+  // Try to restore session from localStorage
+  var savedToken = '';
+  var savedEmail = '';
+  try {
+    savedToken = localStorage.getItem('dras_token') || '';
+    savedEmail = localStorage.getItem('dras_email') || '';
+  } catch(e){}
+
+  if (savedEmail) document.getElementById('epEmail').value = savedEmail;
+
+  if (savedToken) {
+    // Validate existing session token silently
+    showLoad(true, 'Restoring session…');
+    gs('serverValidateToken', [savedToken])
+      .then(function(r) {
+        if (r && r.ok && r.user) {
+          _authToken = savedToken;
+          _authEmail = r.user.email;
+          showLoad(false);
+          _onAuthSuccess(r.user);
+        } else {
+          showLoad(false);
+          _clearSession();
+          document.getElementById('ep').style.display = 'flex';
+        }
+      })
+      .catch(function() {
+        showLoad(false);
+        _clearSession();
+        document.getElementById('ep').style.display = 'flex';
+      });
+  } else {
+    document.getElementById('ep').style.display = 'flex';
+  }
 });
 
-function signIn() {
-  var email = (document.getElementById('epEmail').value || '').trim();
+function authReset() {
+  _showAuthStep('email');
+  document.getElementById('epErr').textContent = '';
+  document.getElementById('epEmail').value = '';
+  document.getElementById('epEmail').focus();
+}
+
+function _showAuthStep(step) {
+  ['email','pin','setpin'].forEach(function(s){
+    document.getElementById('auth-step-'+s).style.display = s === step ? '' : 'none';
+  });
+}
+
+function authStepEmail() {
+  var email = (document.getElementById('epEmail').value || '').trim().toLowerCase();
   var err   = document.getElementById('epErr');
   if (!email || !email.includes('@')) { err.textContent = 'Enter a valid email.'; return; }
   err.textContent = '';
-  try { localStorage.setItem('dras_email', email.toLowerCase()); } catch(e){}
   var btn = document.getElementById('signInBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Signing in…';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Checking…';
 
-  gs('serverGetContext', [email])
-    .then(function(ctx) {
-      try {
-        CTX = ctx;
-        applyCtx();
-        document.getElementById('ep').style.display = 'none';
-        loadDrawings();
-      } catch(e) {
-        btn.disabled = false; btn.innerHTML = 'Continue →';
-        err.textContent = 'Error: ' + e.message;
+  gs('serverCheckEmail', [email])
+    .then(function(r) {
+      btn.disabled = false; btn.innerHTML = 'Continue →';
+      _authEmail = email;
+      try { localStorage.setItem('dras_email', email); } catch(e){}
+
+      if (!r.exists) {
+        err.textContent = 'Email not registered. Ask your DRAS admin to add your account.';
+        return;
+      }
+      if (r.hasPin) {
+        document.getElementById('auth-pin-name').textContent = r.name || email.split('@')[0];
+        document.getElementById('epPin').value = '';
+        document.getElementById('pinErr').textContent = '';
+        _showAuthStep('pin');
+        setTimeout(function(){ document.getElementById('epPin').focus(); }, 80);
+      } else {
+        document.getElementById('auth-setpin-name').textContent = r.name || email.split('@')[0];
+        document.getElementById('epNewPin').value = '';
+        document.getElementById('epConfPin').value = '';
+        document.getElementById('setPinErr').textContent = '';
+        _showAuthStep('setpin');
+        setTimeout(function(){ document.getElementById('epNewPin').focus(); }, 80);
       }
     })
     .catch(function(e) {
       btn.disabled = false; btn.innerHTML = 'Continue →';
-      err.textContent = 'Failed: ' + e.message;
+      err.textContent = e.message;
     });
 }
 
+function authVerifyPin() {
+  var pin = (document.getElementById('epPin').value || '').trim();
+  var err = document.getElementById('pinErr');
+  if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN must be 4 digits.'; return; }
+  err.textContent = '';
+  var btn = document.getElementById('verifyPinBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Verifying…';
+
+  gs('serverVerifyPin', [_authEmail, pin])
+    .then(function(r) {
+      btn.disabled = false; btn.innerHTML = 'Sign In →';
+      if (r && r.ok) {
+        _authToken = r.token;
+        try { localStorage.setItem('dras_token', r.token); } catch(e){}
+        _onAuthSuccess(r.user);
+      } else {
+        err.textContent = 'Incorrect PIN.';
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.innerHTML = 'Sign In →';
+      err.textContent = e.message;
+    });
+}
+
+function authSetPin() {
+  var pin  = (document.getElementById('epNewPin').value  || '').trim();
+  var conf = (document.getElementById('epConfPin').value || '').trim();
+  var err  = document.getElementById('setPinErr');
+  if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN must be exactly 4 digits.'; return; }
+  if (pin !== conf)          { err.textContent = 'PINs do not match.'; return; }
+  err.textContent = '';
+  var btn = document.getElementById('setPinBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Setting PIN…';
+
+  gs('serverSetPin', [_authEmail, pin])
+    .then(function(r) {
+      btn.disabled = false; btn.innerHTML = 'Set PIN & Sign In →';
+      if (r && r.ok) {
+        _authToken = r.token;
+        try { localStorage.setItem('dras_token', r.token); } catch(e){}
+        _onAuthSuccess(r.user);
+      } else {
+        err.textContent = 'Failed to set PIN.';
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.innerHTML = 'Set PIN & Sign In →';
+      err.textContent = e.message;
+    });
+}
+
+function _onAuthSuccess(user) {
+  document.getElementById('ep').style.display = 'none';
+  _showAuthStep('email');
+  // Load context and start app
+  showLoad(true, 'Loading workspace…');
+  gs('serverGetContext', [user.email])
+    .then(function(ctx) {
+      CTX = ctx;
+      applyCtx();
+      loadDrawings();
+    })
+    .catch(function(e) {
+      showLoad(false);
+      toast('Failed to load context: ' + e.message, 'e');
+    });
+}
+
+function _clearSession() {
+  try { localStorage.removeItem('dras_token'); } catch(e){}
+  _authToken = '';
+  _authEmail = '';
+}
+
+function switchAccount() {
+  // Sign out server-side token
+  if (_authToken) {
+    gs('serverSignOut', [_authToken]).catch(function(){});
+  }
+  _clearSession();
+  try { localStorage.removeItem('dras_email'); } catch(e){}
+  CTX = {}; allDrawings = [];
+  document.getElementById('epEmail').value = '';
+  document.getElementById('epErr').textContent = '';
+  document.getElementById('epPin').value = '';
+  document.getElementById('pinErr').textContent = '';
+  var btn = document.getElementById('signInBtn');
+  btn.disabled = false; btn.innerHTML = 'Continue →';
+  _showAuthStep('email');
+  document.getElementById('ep').style.display = 'flex';
+}
+
+// Keep legacy signIn as no-op fallback
+function signIn() { authStepEmail(); }
+
+// ── Change PIN ────────────────────────────────────────────────
+function openChangePinModal() {
+  halert(document.getElementById('changePinAlert'));
+  ['cpOldPin','cpNewPin','cpConfPin'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('changePinBtn').disabled = false;
+  document.getElementById('changePinBtn').textContent = 'Update PIN';
+  document.getElementById('changePinModal').classList.add('open');
+}
+function closeChangePinModal() {
+  document.getElementById('changePinModal').classList.remove('open');
+}
+function doChangePin() {
+  var oldPin  = (document.getElementById('cpOldPin').value  || '').trim();
+  var newPin  = (document.getElementById('cpNewPin').value  || '').trim();
+  var confPin = (document.getElementById('cpConfPin').value || '').trim();
+  var alertEl = document.getElementById('changePinAlert');
+  if (!/^\d{4}$/.test(oldPin)) return salert(alertEl,'Current PIN must be 4 digits.','error');
+  if (!/^\d{4}$/.test(newPin)) return salert(alertEl,'New PIN must be 4 digits.','error');
+  if (newPin !== confPin)      return salert(alertEl,'New PINs do not match.','error');
+  var btn = document.getElementById('changePinBtn');
+  btn.disabled = true; btn.textContent = 'Updating…';
+  gs('serverChangePin', [CTX.user.email, oldPin, newPin])
+    .then(function(r) {
+      btn.disabled = false; btn.textContent = 'Update PIN';
+      if (r && r.ok) {
+        closeChangePinModal();
+        toast('PIN updated successfully.', 's');
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Update PIN';
+      salert(alertEl, e.message, 'error');
+    });
+}
+
+// ── Admin: Reset another user's PIN ──────────────────────────
+function adminResetPin(targetEmail, targetName) {
+  if (!confirm('Reset PIN for "' + targetName + '" (' + targetEmail + ')?\n\nThey will be prompted to set a new PIN on next login.')) return;
+  gs('serverAdminResetPin', [CTX.user.email, targetEmail])
+    .then(function(r) { toast('PIN reset for ' + targetEmail + '.', 'i'); })
+    .catch(function(e){ toast('Failed: ' + e.message, 'e'); });
+}
+
+// ═══════════════════════════════════════════════
+// APPLY CONTEXT (after auth)
+// ═══════════════════════════════════════════════
 function applyCtx() {
   var u = CTX.user;
   document.getElementById('uName').textContent = u.name;
@@ -782,15 +1649,6 @@ function applyCtx() {
   document.getElementById('nav-settings').style.display    = isAdmin ? '' : 'none';
 }
 
-function switchAccount() {
-  try { localStorage.removeItem('dras_email'); } catch(e){}
-  CTX = {}; allDrawings = [];
-  document.getElementById('epEmail').value = '';
-  document.getElementById('epErr').textContent = '';
-  var btn = document.getElementById('signInBtn');
-  btn.disabled = false; btn.innerHTML = 'Continue →';
-  document.getElementById('ep').style.display = 'flex';
-}
 
 // ═══════════════════════════════════════════════
 // NAVIGATION
@@ -804,10 +1662,18 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); v.style.display = ''; });
   document.querySelectorAll('.ni').forEach(function(n){ n.classList.remove('active'); });
   var v = document.getElementById('view-'+name);
-  if (v) { v.style.display = ''; v.classList.add('active'); }
+  if (v) {
+    v.style.animation = 'none';
+    void v.offsetWidth;
+    v.style.animation = '';
+    v.style.display = '';
+    v.classList.add('active');
+  }
   var n = document.getElementById('nav-'+name);
   if (n) n.classList.add('active');
-  document.getElementById('pageTitle').textContent = TITLES[name] || name;
+  var pt = document.getElementById('pageTitle');
+  pt.textContent = TITLES[name] || name;
+  pt.style.animation = 'none'; void pt.offsetWidth; pt.style.animation = 'fadeIn .22s ease-out';
   if (name === 'users')    loadUsers();
   if (name === 'settings') loadSettings();
 }
@@ -864,6 +1730,45 @@ function loadSettings() {
       document.getElementById('cfg-prefix').value  = cfg.DRAWING_PREFIX  || 'WM';
     })
     .catch(function(){});
+  // Also load reminder config
+  gs('serverGetReminderConfig', [CTX.user && CTX.user.email])
+    .then(function(r) {
+      document.getElementById('cfg-reminder-enabled').checked = !!r.enabled;
+      document.getElementById('cfg-reminder-days').value      = r.thresholdDays || 2;
+    })
+    .catch(function(){});
+}
+
+function saveReminderConfig() {
+  var enabled = document.getElementById('cfg-reminder-enabled').checked;
+  var days    = parseInt(document.getElementById('cfg-reminder-days').value, 10) || 2;
+  var alertEl = document.getElementById('reminderAlert');
+  var btn     = document.getElementById('saveReminderBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  gs('serverSaveReminderConfig', [CTX.user.email, enabled, days])
+    .then(function() {
+      btn.disabled = false; btn.textContent = 'Save Reminder Settings';
+      salert(alertEl, '✓ Reminder settings saved.', 'success');
+      toast('Reminder settings updated.', 's');
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Save Reminder Settings';
+      salert(alertEl, 'Failed: ' + e.message, 'error');
+    });
+}
+
+function runReminderNow() {
+  var btn = document.getElementById('runReminderBtn');
+  btn.disabled = true; btn.textContent = 'Running…';
+  gs('serverRunReminderCheck', [CTX.user.email])
+    .then(function() {
+      btn.disabled = false; btn.textContent = '▶ Run Now (Test)';
+      toast('Reminder check triggered — emails sent if any drawings are overdue.', 'i');
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = '▶ Run Now (Test)';
+      toast('Reminder run failed: ' + e.message, 'e');
+    });
 }
 
 // ═══════════════════════════════════════════════
@@ -1018,24 +1923,34 @@ function renderDashboard() {
         if (chartInst) { chartInst.destroy(); chartInst = null; }
         var _lb=['Draft','Checking','Approval','QA','Released'];
         var _vl=[bs.DRAFT,bs.CHECKING,bs.APPROVAL,bs.QA,bs.RELEASED];
-        var _cl=['#94A3B8','#F59E0B','#2B4590','#D62828','#1B6B3A'];
-        chartInst = new Chart(c.getContext('2d'), {
+        var _cl=['#94A3B8','#F59E0B','#3B82F6','#EF4444','#10B981'];
+        chartInst = new Chart(c, {
           type:'doughnut',
-          data:{labels:_lb,datasets:[{data:_vl,backgroundColor:_cl,borderWidth:2,borderColor:'#fff',hoverOffset:3}]},
-          options:{responsive:true,maintainAspectRatio:true,cutout:'68%',
-            animation:{duration:500},
-            plugins:{legend:{display:false},
-              tooltip:{backgroundColor:'rgba(15,23,42,.88)',padding:8,cornerRadius:4,
-                callbacks:{label:function(i){return ' '+i.label+': '+i.raw+' drawing'+(i.raw!==1?'s':'');}}}}
+          data:{
+            labels:_lb,
+            datasets:[{data:_vl,backgroundColor:_cl,borderWidth:2,borderColor:'#fff',hoverOffset:4}]
+          },
+          options:{
+            responsive:true,maintainAspectRatio:true,cutout:'70%',
+            animation:{duration:600,easing:'easeOutQuart'},
+            plugins:{
+              legend:{display:false},
+              tooltip:{
+                backgroundColor:'rgba(15,23,42,.92)',
+                titleColor:'#fff',bodyColor:'rgba(255,255,255,.75)',
+                padding:10,cornerRadius:6,
+                callbacks:{label:function(i){return ' '+i.label+': '+i.raw+(i.raw===1?' drawing':' drawings');}}
+              }
+            }
           }
         });
         var _leg=document.getElementById('chartLegend');
-        if(_leg)_leg.innerHTML=_lb.map(function(l,i){
-          if(!_vl[i])return '';
-          return '<div style="display:flex;align-items:center;gap:6px">'+
+        if(_leg) _leg.innerHTML=_lb.map(function(l,i){
+          if(!_vl[i]) return '';
+          return '<div style="display:flex;align-items:center;gap:8px">'+
             '<span style="width:8px;height:8px;border-radius:50%;background:'+_cl[i]+';flex-shrink:0"></span>'+
-            '<span style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">'+l+'</span>'+
-            '<span style="font-size:14px;font-weight:700;color:var(--ink);margin-left:auto">'+_vl[i]+'</span>'+
+            '<span style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;flex:1">'+l+'</span>'+
+            '<span style="font-size:15px;font-weight:800;color:var(--s900)">'+_vl[i]+'</span>'+
             '</div>';
         }).join('');
       }
@@ -1462,7 +2377,8 @@ function renderUsers(users) {
       '<td style="white-space:nowrap">' +
       '<button class="btn btn-outline btn-xs" onclick="openUM(\''+esc(u.email)+'\')">Edit</button> ' +
       (!isMe
-        ? '<button class="btn btn-danger btn-xs" onclick="confirmDelUser(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Delete</button>'
+        ? '<button class="btn btn-outline btn-xs" onclick="adminResetPin(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Reset PIN</button> ' +
+          '<button class="btn btn-danger btn-xs" onclick="confirmDelUser(\''+esc(u.email)+'\',\''+esc(u.name)+'\')">Delete</button>'
         : '<span style="font-size:10px;color:var(--muted)">(you)</span>'
       ) + '</td></tr>';
   }).join('');
